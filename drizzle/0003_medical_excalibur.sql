@@ -1,0 +1,1 @@
+CREATE INDEX `service_quotes_owner_created_idx` ON `service_quotes` (`owner_email`,`created_at`);

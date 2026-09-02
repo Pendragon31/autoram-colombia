@@ -1,0 +1,34 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1788145806360,
+      "tag": "0000_bouncy_odin",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1788175768456,
+      "tag": "0001_natural_masque",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1788177653062,
+      "tag": "0002_fantastic_lizard",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1788177712422,
+      "tag": "0003_medical_excalibur",
+      "breakpoints": true
+    }
+  ]
+}

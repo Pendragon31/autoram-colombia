@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://autoram-colombia.netlify.app/sitemap.xml

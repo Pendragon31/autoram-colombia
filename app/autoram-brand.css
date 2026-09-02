@@ -1,0 +1,146 @@
+/* Autoram v1.3 · wordmark técnico inspirado en el automovilismo clásico */
+@font-face {
+  font-family: "Autoram Wide";
+  src: url("/fonts/michroma-regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+.brand.autoram {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 10px;
+  padding: 0;
+  min-height: 34px;
+  white-space: nowrap;
+  isolation: isolate;
+}
+
+.brand.autoram > .brand-rail {
+  width: 7px;
+  height: auto;
+  min-width: 7px;
+  border: 0;
+  border-radius: 1px;
+  background: linear-gradient(90deg, #fcd116 0 40%, transparent 40% 47%, #003893 47% 70%, transparent 70% 77%, #ce1126 77% 100%);
+  color: inherit;
+  display: block;
+  transform: skewX(-8deg);
+  box-shadow: 0 0 18px rgba(252, 209, 22, .16);
+}
+
+.brand.autoram > .brand-copy {
+  width: auto;
+  height: auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0;
+  transform: none;
+  line-height: 1;
+}
+
+.brand.autoram .brand-copy b {
+  font-family: "Autoram Wide", "Arial Black", sans-serif;
+  font-size: 18px;
+  font-weight: 400;
+  font-style: normal;
+  line-height: .9;
+  letter-spacing: .045em;
+  color: #f5f7f5;
+  text-shadow: 0 8px 24px rgba(0, 0, 0, .28);
+}
+
+.brand.autoram .brand-copy small {
+  margin: 7px 0 0 1px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #b8ff2c;
+  font-size: 8px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: .32em;
+}
+
+.login-logo .brand.autoram,
+.login-mobile-brand .brand.autoram {
+  min-height: 47px;
+  gap: 13px;
+}
+
+.login-logo .brand.autoram > .brand-rail,
+.login-mobile-brand .brand.autoram > .brand-rail {
+  width: 9px;
+  min-width: 9px;
+}
+
+.login-logo .brand.autoram .brand-copy b,
+.login-mobile-brand .brand.autoram .brand-copy b {
+  font-size: 25px;
+  letter-spacing: .055em;
+}
+
+.login-logo .brand.autoram .brand-copy small,
+.login-mobile-brand .brand.autoram .brand-copy small {
+  margin-top: 9px;
+  font-size: 9px;
+}
+
+.login-form-panel::before {
+  content: "";
+  position: absolute;
+  width: 310px;
+  height: 170px;
+  right: -135px;
+  top: 8%;
+  border: 1px solid rgba(184, 255, 44, .07);
+  border-left-width: 16px;
+  border-radius: 44px 0 0 44px;
+  transform: skewY(-17deg);
+  pointer-events: none;
+}
+
+@media (max-width: 760px) {
+  .brand.autoram {
+    min-height: 31px;
+    gap: 7px;
+  }
+  .brand.autoram > .brand-rail {
+    width: 5px;
+    min-width: 5px;
+  }
+  .brand.autoram .brand-copy b {
+    font-size: 15px;
+    letter-spacing: .035em;
+  }
+  .brand.autoram .brand-copy small {
+    margin-top: 6px;
+    font-size: 7px;
+    letter-spacing: .25em;
+  }
+  .mobile-brand .brand.autoram .brand-copy small { display: none; }
+  .login-mobile-brand .brand.autoram {
+    min-height: 45px;
+    gap: 11px;
+  }
+  .login-mobile-brand .brand.autoram > .brand-rail {
+    width: 8px;
+    min-width: 8px;
+  }
+  .login-mobile-brand .brand.autoram .brand-copy b {
+    font-size: 23px;
+    letter-spacing: .045em;
+  }
+  .login-mobile-brand .brand.autoram .brand-copy small {
+    display: block;
+    margin-top: 8px;
+    font-size: 8px;
+  }
+}

@@ -1,0 +1,82 @@
+.trip-map {
+  position: relative;
+  width: 100%;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #080b0a;
+  border: 1px solid rgba(245, 247, 245, 0.08);
+}
+
+.trip-map__canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.trip-map__empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: rgba(245, 247, 245, 0.6);
+  font-size: 14px;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(8, 11, 10, 0.4), rgba(8, 11, 10, 0.75));
+}
+
+/* Controles de MapLibre en tono carbón */
+.trip-map .maplibregl-ctrl-group {
+  background: #121614;
+  border: 1px solid rgba(245, 247, 245, 0.1);
+  box-shadow: none;
+}
+.trip-map .maplibregl-ctrl-group button {
+  background: transparent;
+}
+.trip-map .maplibregl-ctrl-group button + button {
+  border-top-color: rgba(245, 247, 245, 0.1);
+}
+.trip-map .maplibregl-ctrl-icon {
+  filter: invert(1) opacity(0.85);
+}
+.trip-map .maplibregl-ctrl-attrib {
+  background: rgba(8, 11, 10, 0.7);
+  color: rgba(245, 247, 245, 0.55);
+  font-size: 10px;
+}
+.trip-map .maplibregl-ctrl-attrib a {
+  color: rgba(245, 247, 245, 0.75);
+}
+
+/* En modo viaje, el mapa ocupa más y el pulso del punto respira */
+.trip-map--live {
+  border-radius: 18px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .trip-map--live .maplibregl-canvas-container {
+    animation: none;
+  }
+}
+
+/* ---- Mapa de destino (cotizador) ---- */
+.destination-map { position: relative; width: 100%; overflow: hidden; background: #d6d3c7; }
+.destination-map__canvas { position: absolute; inset: 0; }
+.destination-map__hint {
+  position: absolute; left: 50%; top: 14px; transform: translateX(-50%);
+  padding: 8px 14px; border-radius: 999px; font-size: 12px; font-weight: 600;
+  background: rgba(12, 20, 16, 0.88); color: #fff; pointer-events: none; white-space: nowrap;
+}
+.destination-map .maplibregl-canvas { cursor: crosshair; }
+
+/* El mapa en vivo llena la tarjeta de Navegar; los controles de la app quedan encima */
+.nav-map-stage > .trip-map { position: absolute; inset: 0; border: 0; border-radius: 0; z-index: 1; }
+.nav-map-stage > .trip-map .maplibregl-ctrl-top-right { top: 64px; }
+.trip-history { display: grid; gap: 12px; }
+.trip-history article { display: grid; gap: 10px; }
+.trip-history .trip-history-meta { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 13px; }
+.trip-history .trip-history-meta b { font-size: 15px; }
+.trip-history .trip-history-meta small { color: #8e9994; }
+.trip-draft { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.trip-draft button { min-height: 40px; padding: 0 14px; border-radius: 10px; border: 1px solid rgba(245,247,245,.16); background: transparent; color: inherit; font-size: 13px; cursor: pointer; }
+.trip-draft button.primary { background: #a8ea3e; color: #101510; border-color: #a8ea3e; }
+@media (max-width: 760px) { .destination-map { height: 245px !important; } }

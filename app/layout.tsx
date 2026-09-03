@@ -5,6 +5,7 @@ import "./autoram-brand.css";
 import "./work-pricing.css";
 import "./real-maps.css";
 import "./trip-map.css";
+import "./v19.css";
 
 const SITE_URL = "https://autoram-colombia.netlify.app";
 

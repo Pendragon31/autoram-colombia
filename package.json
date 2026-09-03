@@ -1,13 +1,13 @@
 {
   "name": "autoram-colombia",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
   },
   "scripts": {
     "install:ci": "bash scripts/install-ci.sh",
-    "dev": "next dev",
+    "dev": "vite",
     "build": "next build",
     "start": "next start",
     "test": "npm run build",

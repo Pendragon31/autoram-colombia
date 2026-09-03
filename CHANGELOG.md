@@ -25,3 +25,10 @@
 - Seguimiento GPS mejorado en la sección Navegar.
 - Identidad de Autoram con detalles de la bandera de Colombia.
 - Configuración corregida para publicación estática en Netlify.
+# Autoram Colombia v1.9
+
+- Nuevo tablero de Inicio tipo cockpit con información real del vehículo, ingresos, gastos y kilómetros.
+- Accesos directos para cotizar servicios e iniciar recorridos.
+- Módulo Trabajo con tarifas urbana y rural visibles desde el primer momento.
+- Navegación móvil simplificada a cinco accesos, con textos e iconos más legibles.
+- Identificador de versión visible junto a la marca.

@@ -4,7 +4,7 @@ Aplicación web móvil para administrar uno o varios vehículos, registrar combu
 
 ## Estado actual
 
-Versión base: **v1.8**.
+Versión actual: **v1.9**.
 
 - Registro e inicio de sesión con Supabase.
 - Parque automotor con varios vehículos por conductor.

@@ -65,13 +65,13 @@ function Brand() {
   </div>
 }
 
-function LoginFlow({authenticated}:{authenticated:()=>void}) {
+function LoginFlow({authenticated}:{authenticated:()=>Promise<void>}) {
   const [mode,setMode]=useState<"login"|"signup">("login"); const [email,setEmail]=useState(""); const [password,setPassword]=useState("");
   const [busy,setBusy]=useState(false); const [error,setError]=useState(""); const [message,setMessage]=useState("");
   const submit=async(event:React.FormEvent)=>{event.preventDefault();if(busy)return;setBusy(true);setError("");setMessage("");
     try{const supabase=getSupabaseBrowserClient();
-      if(mode==="login"){const {error:authError}=await supabase.auth.signInWithPassword({email:email.trim(),password});if(authError)throw authError;authenticated()}
-      else{const {data,error:authError}=await supabase.auth.signUp({email:email.trim(),password,options:{emailRedirectTo:window.location.origin}});if(authError)throw authError;if(data.session)authenticated();else setMessage("Revisa tu correo y confirma la cuenta para entrar a Autoram.")}
+      if(mode==="login"){const {error:authError}=await supabase.auth.signInWithPassword({email:email.trim(),password});if(authError)throw authError;await authenticated()}
+      else{const {data,error:authError}=await supabase.auth.signUp({email:email.trim(),password,options:{emailRedirectTo:window.location.origin}});if(authError)throw authError;if(data.session)await authenticated();else setMessage("Revisa tu correo y confirma la cuenta para entrar a Autoram.")}
     }catch(reason){setError(reason instanceof Error?reason.message:"No pudimos completar el ingreso.")}finally{setBusy(false)}};
   return <main className="login-page"><section className="login-brand-panel"><div className="login-logo"><Brand/></div><div className="login-message"><span>AUTORAM COLOMBIA</span><h1>Tu vehículo.<br/><em>Tus números.</em><br/>Tu camino.</h1><p>Combustible, recorridos, mantenimiento y rentabilidad en una experiencia diseñada para conductores colombianos.</p></div><div className="login-proof"><div><ShieldCheck size={18}/><span><b>Información protegida</b><small>Cada conductor ve únicamente sus datos</small></span></div><div><Disc3 size={18}/><span><b>Parque automotor</b><small>Varios vehículos en una sola cuenta</small></span></div></div></section><section className="login-form-panel"><div className="login-mobile-brand"><Brand/></div><div className="login-box"><div className="code-icon"><ShieldCheck size={26}/></div><small className="login-over">{mode==="login"?"ACCESO SEGURO":"NUEVA CUENTA"}</small><h2>{mode==="login"?"Bienvenido a Autoram":"Crea tu cuenta"}</h2><p>{mode==="login"?"Ingresa con el correo y la contraseña que registraste.":"Tu información quedará sincronizada y protegida en todos tus dispositivos."}</p>{error&&<div className="form-error"><AlertTriangle size={16}/>{error}</div>}{message&&<div className="auth-success"><Check size={16}/>{message}</div>}<form className="auth-form" onSubmit={submit}><label><span>Correo electrónico</span><input type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="nombre@correo.com" required/></label><label><span>Contraseña</span><input type="password" autoComplete={mode==="login"?"current-password":"new-password"} minLength={8} value={password} onChange={e=>setPassword(e.target.value)} placeholder="Mínimo 8 caracteres" required/></label><button className="login-main" type="submit" disabled={busy}>{busy?"Conectando…":mode==="login"?"Ingresar":"Crear cuenta"}<ChevronRight size={18}/></button></form><button className="auth-toggle" type="button" onClick={()=>{setMode(mode==="login"?"signup":"login");setError("");setMessage("")}}>{mode==="login"?"¿Primera vez? Crear una cuenta":"Ya tengo cuenta · Ingresar"}</button><div className="security-note"><LockKeyhole size={17}/><span>Autenticación y registros protegidos por Supabase.</span></div><p className="terms">Al continuar aceptas los términos de uso y la política de privacidad de Autoram.</p></div></section></main>
 }
@@ -91,7 +91,7 @@ function VehicleOnboarding({complete}:{complete:(vehicle:VehicleProfile)=>void})
   const [photoState,setPhotoState]=useState<"idle"|"loading"|"found"|"error">("idle");
   const update=(key:keyof VehicleProfile,value:string)=>setVehicle(v=>({...v,[key]:value}));
   const findVehicleImage=async(make=vehicle.brand,model=vehicle.model,year=vehicle.year)=>{if(!make||!model)return;setPhotoState("loading");try{const query=encodeURIComponent(`${make} ${model} ${year}`);const response=await fetch(`https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${query}&gsrnamespace=6&gsrlimit=6&prop=imageinfo&iiprop=url%7Cextmetadata&iiurlwidth=900&format=json&origin=*`);if(!response.ok)throw new Error("image");const data=await response.json();const pages=Object.values(data.query?.pages||{}) as Array<{imageinfo?:Array<{thumburl?:string;url?:string;descriptionurl?:string;extmetadata?:Record<string,{value?:string}>}>}>;const info=pages.map(p=>p.imageinfo?.[0]).find(Boolean);if(!info?.thumburl&&!info?.url)throw new Error("image");const author=String(info.extmetadata?.Artist?.value||"Wikimedia Commons").replace(/<[^>]*>/g,"").slice(0,90);setVehicle(v=>({...v,imageUrl:info.thumburl||info.url||"",imageAttribution:`${author} · Wikimedia Commons`}));setPhotoState("found")}catch{setPhotoState("error")}};
-  const lookupVin=async()=>{const vin=vehicle.vin.trim().toUpperCase();if(vin.length<8){setVinState("error");return}setVinState("loading");try{const response=await fetch(`https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValuesExtended/${encodeURIComponent(vin)}?format=json`);if(!response.ok)throw new Error("vin");const data=await response.json();const found=data.Results?.[0];if(!found?.Make||!found?.Model)throw new Error("vin");const brand=String(found.Make),model=String(found.Model),year=String(found.ModelYear||vehicle.year),fuel=String(found.FuelTypePrimary||vehicle.fuel),transmission=String(found.TransmissionStyle||vehicle.transmission);setVehicle(v=>({...v,vin,brand,model,year,fuel,transmission}));setVinState("found");void findVehicleImage(brand,model,year)}catch{setVinState("error")}};
+  const lookupVin=async()=>{const vin=vehicle.vin.trim().toUpperCase();if(!/^[A-HJ-NPR-Z0-9]{17}$/.test(vin)){setVinState("error");return}setVinState("loading");try{const response=await fetch(`https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValuesExtended/${encodeURIComponent(vin)}?format=json`);if(!response.ok)throw new Error("vin");const data=await response.json();const found=data.Results?.[0];if(!found?.Make||!found?.Model)throw new Error("vin");const brand=String(found.Make),model=String(found.Model),year=String(found.ModelYear||vehicle.year),fuel=String(found.FuelTypePrimary||vehicle.fuel),transmission=String(found.TransmissionStyle||vehicle.transmission);setVehicle(v=>({...v,vin,brand,model,year,fuel,transmission}));setVinState("found");void findVehicleImage(brand,model,year)}catch{setVinState("error")}};
   const basicsReady=Boolean(vehicle.brand.trim()&&vehicle.model.trim()&&vehicle.year&&vehicle.plate.trim());
   const operationReady=vehicle.odometer!=="";
   const health=[{key:"tires",label:"Estado de las llantas",icon:Disc3},{key:"brakes",label:"Frenos",icon:ShieldCheck},{key:"fluids",label:"Aceite y fluidos",icon:Droplets},{key:"battery",label:"Batería",icon:Activity},{key:"general",label:"Estado general",icon:CarFront}] as const;
@@ -127,7 +127,7 @@ function SmartVehicleOnboarding({complete,cancel}:{complete:(vehicle:VehicleProf
     }catch{setPhotoState("error")}
   };
   const lookupVin=async()=>{
-    const vin=vehicle.vin.trim().toUpperCase();if(vin.length<8){setVinState("error");return}setVinState("loading");
+    const vin=vehicle.vin.trim().toUpperCase();if(!/^[A-HJ-NPR-Z0-9]{17}$/.test(vin)){setVinState("error");return}setVinState("loading");
     try{
       const response=await fetch(`https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValuesExtended/${encodeURIComponent(vin)}?format=json`);
       if(!response.ok)throw new Error("vin");const data=await response.json();const found=data.Results?.[0];if(!found?.Make||!found?.Model)throw new Error("vin");
@@ -174,10 +174,35 @@ export default function App() {
   const loadAccount=useCallback(async()=>{const response=await autoramFetch("/api/autoram",{cache:"no-store"});const payload=await response.json();if(!response.ok)throw new Error(payload.error||"No pudimos abrir tu cuenta");setDriver(payload.driver||null);setVehicle(payload.vehicle||null);setVehicles(payload.vehicles||[]);setFuelRecords(payload.fuel||[]);setMaintenanceRecords(payload.maintenance||[]);setWorkSessions(payload.work||[]);setTrips(payload.trips||[]);setQuotes(payload.quotes||[]);setDocuments(payload.documents||[]);setSummary(payload.summary||null);const current=(payload.work||[]).find((session:WorkSessionRecord)=>!session.endedAt);setWorkActive(Boolean(current));setWorkConfig(current?{role:current.role,platforms:JSON.parse(current.platforms||"[]"),activity:current.activity||"",odometer:String(current.startOdometer)}:null);setStage(payload.driver?(payload.vehicle?"app":"onboarding"):"driver");setSyncError(payload.offline?"Sin señal: estás viendo la última copia guardada. Todo lo que registres se enviará al recuperar conexión.":"")},[]);
   useEffect(()=>{outbox.start(getSupabaseBrowserClient());return()=>outbox.stop()},[]);
   useVehicleRealtime(stage==="app"?getSupabaseBrowserClient():null,vehicle?.id||null,()=>{void loadAccount().catch(()=>undefined)});
-  useEffect(()=>{let active=true;const supabase=getSupabaseBrowserClient();supabase.auth.getSession().then(({data})=>{if(!active)return;if(data.session)void loadAccount().catch(error=>{setSyncError(error instanceof Error?error.message:"No pudimos conectar");setStage("login")});else setStage("login")});const {data:listener}=supabase.auth.onAuthStateChange((event,session)=>{if(!active)return;if(event==="SIGNED_OUT"||!session)setStage("login");else if(event==="SIGNED_IN")void loadAccount()});return()=>{active=false;listener.subscription.unsubscribe()}},[loadAccount]);
+  useEffect(() => {
+    let active = true;
+    let scheduled: ReturnType<typeof setTimeout> | undefined;
+    const supabase = getSupabaseBrowserClient();
+    const fail = (error: unknown) => {
+      if (!active) return;
+      setSyncError(error instanceof Error ? error.message : "No pudimos recuperar tu cuenta.");
+      setStage("login");
+    };
+    void supabase.auth.getSession().then(({ data, error }) => {
+      if (!active) return;
+      if (error) throw error;
+      if (data.session) return loadAccount();
+      setStage("login");
+    }).catch(fail);
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!active) return;
+      if (scheduled !== undefined) clearTimeout(scheduled);
+      if (event === "SIGNED_OUT" || !session) setStage("login");
+      else if (event === "SIGNED_IN") {
+        // Run after the auth callback releases its session lock.
+        scheduled = setTimeout(() => { if (active) void loadAccount().catch(fail); }, 0);
+      }
+    });
+    return () => { active = false; if (scheduled !== undefined) clearTimeout(scheduled); listener.subscription.unsubscribe(); };
+  }, [loadAccount]);
   const post=async(action:string,data:unknown)=>{const response=await autoramFetch("/api/autoram",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action,data})});const payload=await response.json();if(!response.ok)throw new Error(payload.error||"No fue posible guardar");return payload};
   if(stage==="loading")return <main className="app-loading"><Brand/><span><i/></span><h1>Preparando tu centro de control</h1><p>Sincronizando perfil, vehículo e historial…</p></main>;
-  if(stage==="login")return <LoginFlow authenticated={()=>void loadAccount()}/>;
+  if(stage==="login")return <LoginFlow authenticated={loadAccount}/>;
   if(stage==="driver")return <DriverOnboarding complete={async d=>{await post("saveDriver",d);setDriver(d);setStage("onboarding")}}/>;
   if(stage==="onboarding")return <SmartVehicleOnboarding complete={async v=>{await post("saveVehicle",v);await loadAccount()}}/>;
   if(addingVehicle)return <SmartVehicleOnboarding cancel={()=>setAddingVehicle(false)} complete={async v=>{await post("addVehicle",v);setAddingVehicle(false);await loadAccount();setView("parque")}}/>;

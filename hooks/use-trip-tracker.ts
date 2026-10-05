@@ -22,7 +22,11 @@ type Options = { vehicleId: number | null; maxAccuracyM?: number; minStepM?: num
 type Draft = { vehicleId: number | null; startedAt: string; points: TrackPoint[] };
 
 const DRAFT_KEY = "autoram.trip.draft.v1";
-const loadDraft = (): Draft | null => { try { const raw = localStorage.getItem(DRAFT_KEY); return raw ? JSON.parse(raw) as Draft : null; } catch { return null; } };
+const loadDraft = (): Draft | null => { try { const raw = localStorage.getItem(DRAFT_KEY); if (!raw) return null;
+  const d = JSON.parse(raw) as Draft;
+  if (!d || !Number.isFinite(Date.parse(d.startedAt)) || !Array.isArray(d.points) ||
+      !d.points.every(point => Array.isArray(point) && point.length === 3 && point.every(Number.isFinite) && Math.abs(point[0]) <= 90 && Math.abs(point[1]) <= 180)) return null;
+  return d; } catch { return null; } };
 const saveDraft = (d: Draft | null) => { try { if (d) localStorage.setItem(DRAFT_KEY, JSON.stringify(d)); else localStorage.removeItem(DRAFT_KEY); } catch { /* sin espacio */ } };
 
 export function useTripTracker({ vehicleId, maxAccuracyM = 50, minStepM = 8, maxJumpKmh = 200 }: Options) {
@@ -45,10 +49,7 @@ export function useTripTracker({ vehicleId, maxAccuracyM = 50, minStepM = 8, max
   const draftTimer = useRef<number | null>(null);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      const d = loadDraft();
-      setHasDraft(!!d && d.vehicleId === vehicleId && d.points.length > 1);
-    }, 0);
+    const timer = window.setTimeout(() => { const d = loadDraft(); setHasDraft(!!d && d.vehicleId === vehicleId && d.points.length > 1); }, 0);
     return () => window.clearTimeout(timer);
   }, [vehicleId]);
 
@@ -89,11 +90,19 @@ export function useTripTracker({ vehicleId, maxAccuracyM = 50, minStepM = 8, max
   const onError = useCallback((err: GeolocationPositionError) => {
     const msgs: Record<number, string> = { 1: "Autoriza la ubicación para registrar el recorrido.", 2: "No hay señal de GPS. Seguimos intentando.", 3: "El GPS tarda en responder. Seguimos intentando." };
     setMessage(msgs[err.code] ?? "No pudimos leer la ubicación.");
-    if (err.code === 1) setState("error");
-  }, []);
+    if (err.code === 1) {
+      if (watchId.current != null) navigator.geolocation.clearWatch(watchId.current);
+      if (draftTimer.current != null) window.clearInterval(draftTimer.current);
+      watchId.current = null; draftTimer.current = null;
+      persistDraft(); releaseWakeLock();
+      setHasDraft(pts.current.length > 1); setState("error");
+    }
+  }, [persistDraft, releaseWakeLock]);
 
   const beginWatch = useCallback(() => {
     if (!("geolocation" in navigator)) { setState("error"); setMessage("Este dispositivo no permite usar GPS."); return; }
+    if (watchId.current != null) navigator.geolocation.clearWatch(watchId.current);
+    if (draftTimer.current != null) window.clearInterval(draftTimer.current);
     watchId.current = navigator.geolocation.watchPosition(onPosition, onError, { enableHighAccuracy: true, maximumAge: 0, timeout: 15_000 });
     void acquireWakeLock();
     draftTimer.current = window.setInterval(persistDraft, 10_000);
@@ -110,14 +119,14 @@ export function useTripTracker({ vehicleId, maxAccuracyM = 50, minStepM = 8, max
   }, [vehicleId, beginWatch]);
 
   const resume = useCallback(() => {
-    const d = loadDraft(); if (!d) return;
+    const d = loadDraft(); if (!d || d.vehicleId !== vehicleId) return;
     pts.current = d.points; dist.current = 0; maxSpeed.current = 0;
     for (let i = 1; i < d.points.length; i++) dist.current += haversineKm({ lat: d.points[i - 1][0], lng: d.points[i - 1][1] }, { lat: d.points[i][0], lng: d.points[i][1] });
     setPoints(d.points); setDistanceKm(Number(dist.current.toFixed(2)));
     startedRef.current = d.startedAt; setStartedAt(d.startedAt);
     setHasDraft(false); setState("locating"); setMessage("Retomando el recorrido…");
     beginWatch();
-  }, [beginWatch]);
+  }, [beginWatch, vehicleId]);
 
   const discardDraft = useCallback(() => { saveDraft(null); setHasDraft(false); }, []);
 
@@ -129,6 +138,7 @@ export function useTripTracker({ vehicleId, maxAccuracyM = 50, minStepM = 8, max
     const raw = pts.current;
     const endedAt = new Date().toISOString();
     if (raw.length < 2 || dist.current < 0.05) { saveDraft(null); setState("idle"); setMessage("El recorrido no registró distancia."); return null; }
+    persistDraft();
     setState("saving");
     const route = simplifyRoute(raw, 10);
     const first = raw[0], lastP = raw[raw.length - 1];
@@ -139,10 +149,10 @@ export function useTripTracker({ vehicleId, maxAccuracyM = 50, minStepM = 8, max
       startLat: first[0], startLng: first[1], endLat: lastP[0], endLng: lastP[1],
       routePoints: route, maxSpeedKmh: Number(maxSpeed.current.toFixed(1)), avgSpeedKmh: Number((dist.current / (durationSeconds / 3600)).toFixed(1)),
     };
-  }, [releaseWakeLock]);
+  }, [releaseWakeLock, persistDraft]);
 
   /** Llamar después de guardar (o si falló) para volver a reposo. */
-  const finish = useCallback((ok: boolean, msg?: string) => { if (ok) saveDraft(null); setState(ok ? "idle" : "error"); setMessage(msg ?? ""); if (ok) { pts.current = []; setPoints([]); } }, []);
+  const finish = useCallback((ok: boolean, msg?: string) => { if (ok) saveDraft(null); setHasDraft(!ok && pts.current.length > 1); setState(ok ? "idle" : "error"); setMessage(msg ?? ""); if (ok) { pts.current = []; setPoints([]); } }, []);
 
   useEffect(() => () => { if (watchId.current != null) navigator.geolocation.clearWatch(watchId.current); if (draftTimer.current) window.clearInterval(draftTimer.current); releaseWakeLock(); }, [releaseWakeLock]);
   useEffect(() => { const onVis = () => { if (document.visibilityState === "visible" && watchId.current != null) void acquireWakeLock(); }; document.addEventListener("visibilitychange", onVis); return () => document.removeEventListener("visibilitychange", onVis); }, [acquireWakeLock]);

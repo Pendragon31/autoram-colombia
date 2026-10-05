@@ -99,9 +99,7 @@ class Outbox {
   subscribe(fn: (s: OutboxState) => void) {
     this.listeners.add(fn);
     fn(this.state);
-    return () => {
-      this.listeners.delete(fn);
-    };
+    return () => { this.listeners.delete(fn); };
   }
 
   /**
@@ -125,11 +123,13 @@ class Outbox {
   /** Intenta enviar todo lo pendiente, en orden. */
   async flush(): Promise<void> {
     if (!this.client || this.state.syncing || !this.state.online) return;
+    this.set({ syncing: true });
+    try {
     const items = await this.pendingItems();
     if (!items.length) return;
-    this.set({ syncing: true });
 
     for (const item of items) {
+      if (item.attempts >= MAX_ATTEMPTS) continue;
       try {
         await this.send(item);
         await tx('readwrite', (s) => s.delete(item.id));
@@ -140,15 +140,16 @@ class Outbox {
         // los dejamos para revisión pero no bloqueamos los demás.
         await tx('readwrite', (s) => s.put({ ...item, attempts, last_error: msg }));
         if (attempts >= MAX_ATTEMPTS) {
-          console.warn('[outbox] descartado tras', attempts, 'intentos', item, msg);
-          await tx('readwrite', (s) => s.delete(item.id));
+          // Preserve failed records for review instead of deleting user data.
+          console.warn('[outbox] registro pendiente de revisión tras', attempts, 'intentos');
         }
         if (/network|fetch|timeout|Failed to fetch/i.test(msg)) break; // sin señal: paramos y esperamos
       }
     }
 
     await this.refreshCount();
-    this.set({ syncing: false, lastSyncAt: Date.now() });
+    this.set({ lastSyncAt: Date.now() });
+    } finally { this.set({ syncing: false }); }
   }
 
   private async send(item: OutboxItem) {

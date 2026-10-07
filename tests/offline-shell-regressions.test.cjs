@@ -10,7 +10,7 @@ function worker() {
   const cache = name => ({ addAll: async urls => { stores.set(name, new Map(urls.map(url => [url, new Response(url === '/mapas' ? 'OFFLINE MAPS' : 'PUBLIC SHELL')]))); }, match: async request => stores.get(name)?.get(typeof request === 'string' ? request : new URL(request.url).pathname)?.clone() });
   const globals = {
     self: { location: { origin: 'https://autoram.example' }, addEventListener: (name, handler) => events.set(name, handler), skipWaiting: async () => {}, clients: { claim: async () => {} } },
-    caches: { open: async name => cache(name), keys: async () => ['autoram-app-previous', 'autoram-map-fonts-v1', 'unrelated-cache'], delete: async name => { deleted.push(name); }, match: async () => undefined },
+    caches: { open: async name => cache(name), keys: async () => ['autoram-app-oldest', 'autoram-app-previous', 'autoram-app-test-version', 'autoram-map-fonts-v1', 'unrelated-cache'], delete: async name => { deleted.push(name); stores.delete(name); }, match: async request => { const path=typeof request==='string'?request:new URL(request.url).pathname;for(const store of stores.values()){const response=store.get(path);if(response)return response.clone();} } },
     fetch: async request => { requests.push(request.url); throw new Error('offline'); }, URL, Response, AbortSignal,
   };
   const source = workerCode(fs.readFileSync('scripts/offline-worker.template.js', 'utf8'), ['/', '/mapas', '/_next/static/example.js'], 'test-version');
@@ -35,7 +35,14 @@ test('offline worker ignores Auth, database, private images, authenticated reque
 test('worker update retains downloaded-map fonts and unrelated caches', async () => {
   const { dispatch, deleted } = worker();
   await dispatch('activate');
-  assert.deepEqual(deleted, ['autoram-app-previous']);
+  assert.deepEqual(deleted, ['autoram-app-oldest']);
+});
+test('an open GPS page can load a previous cached chunk after the app updates offline', async () => {
+  const { dispatch, stores } = worker();
+  stores.set('autoram-app-previous', new Map([['/_next/static/previous-chunk.js', new Response('PREVIOUS PUBLIC SCRIPT')]]));
+  await dispatch('install'); await dispatch('activate');
+  const response = await dispatch('fetch', { request: request('/_next/static/previous-chunk.js') });
+  assert.equal(await response.text(), 'PREVIOUS PUBLIC SCRIPT');
 });
 test('runtime signed-in HTML is never written over the public offline shell', async () => {
   const { dispatch, stores } = worker();

@@ -1,8 +1,9 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { newClientId, outbox } from "@/lib/offline-queue";
+import { asError } from "@/lib/errors";
 
 let browserClient: SupabaseClient | null = null;
-type RowValue = string | number | boolean | null | RowValue[] | { [key: string]: RowValue };
+type RowValue = string | number | boolean | null | RowValue[] | { [key: string]: RowValue | undefined };
 type Row = Record<string, RowValue | undefined>;
 
 function publicConfig() {
@@ -21,7 +22,7 @@ export function getSupabaseBrowserClient() {
 }
 
 function json(data: unknown, status = 200) { return new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json" } }); }
-function fail(error: unknown): never { throw error instanceof Error ? error : new Error(String(error)); }
+function fail(error: unknown): never { throw asError(error); }
 function driverOut(row: Row | null) { return row ? { fullName: row.full_name, document: row.document, phone: row.phone, email: row.email || "", city: row.city, address: row.address || "", license: row.license, category: row.category } : null; }
 function vehicleOut(row: Row | null) { return row ? { id: Number(row.id), type: row.type, brand: row.brand, model: row.model, version: row.version || "", year: String(row.year), plate: row.plate, color: row.color || "", fuel: row.fuel, transmission: row.transmission, odometer: String(row.odometer), tires: row.tires, brakes: row.brakes, fluids: row.fluids, battery: row.battery, general: row.general, vin: row.vin || "", imageUrl: row.image_url || "", imageAttribution: row.image_attribution || "" } : null; }
 function fuelOut(row: Row) { return { id: Number(row.id), vehicleId: Number(row.vehicle_id), occurredAt: row.occurred_at, odometer: Number(row.odometer), station: row.station, fuelType: row.fuel_type, gallons: Number(row.gallons), pricePerGallon: Number(row.price_per_gallon), total: Number(row.total), payment: row.payment || "", fillType: row.fill_type || "", notes: row.notes || "" }; }
@@ -34,16 +35,29 @@ function documentOut(row: Row) { return { id: Number(row.id), vehicleId: Number(
 const NETWORK_ERROR = /fetch|network|timeout|ECONN|Load failed/i;
 function isNetworkError(error: { message?: string } | null | undefined) { return !!error && NETWORK_ERROR.test(String(error.message || "")); }
 
-// Inserta ya si hay señal; si no, deja el registro en la cola offline y devuelve un id temporal (negativo).
-async function insertOrQueue(supabase: SupabaseClient, table: string, payload: Row) {
-  const clientId = newClientId();
-  if (typeof navigator === "undefined" || navigator.onLine) {
+// La copia duradera existe antes de cualquier solicitud de red.
+async function insertOrQueue(supabase: SupabaseClient, table: string, payload: Row, clientId = newClientId()) {
+  await outbox.enqueue({ id: clientId, table, op: "insert", payload }, { autoFlush: false });
+  const item = (await outbox.pendingItems(String(payload.user_id))).find(record => record.id === clientId)!;
+  const queued = { id: item.local_id!, createdAt: new Date(item.created_at).toISOString(), queued: true };
+  if (typeof navigator !== "undefined" && !navigator.onLine) return queued;
+  try {
     const result = await supabase.from(table).insert({ ...payload, client_id: clientId }).select("id, created_at").single();
-    if (!result.error) return { id: Number(result.data.id), createdAt: String(result.data.created_at || new Date().toISOString()), queued: false };
-    if (!isNetworkError(result.error)) fail(result.error);
+    let saved = result.data, error = result.error;
+    if (result.error?.code === "23505") {
+      const existing = await supabase.from(table).select("id, created_at").eq("client_id", clientId).eq("user_id", String(payload.user_id)).maybeSingle();
+      if (!existing.error && existing.data) { saved = existing.data; error = null; }
+    }
+    if (error) fail(error);
+    if (!saved) throw new Error("No pudimos confirmar el registro. La copia sigue en el teléfono.");
+    await cacheConfirmedInsert(String(payload.user_id), table, { ...payload, ...saved, client_id: clientId });
+    await outbox.acknowledge(clientId);
+    return { id: Number(saved.id), createdAt: String(saved.created_at || queued.createdAt), queued: false };
+  } catch (error) {
+    await outbox.recordFailure(clientId, error);
+    if (isNetworkError(asError(error))) return queued;
+    fail(error);
   }
-  await outbox.enqueue({ id: clientId, table, op: "insert", payload });
-  return { id: -Date.now(), createdAt: new Date().toISOString(), queued: true };
 }
 
 // Resumen del panel calculado en la base de datos (003_views_rpc). Si la función aún no existe, devuelve null.
@@ -56,7 +70,39 @@ async function loadSummary(supabase: SupabaseClient, vehicleId: number) {
 
 const ACCOUNT_CACHE_KEY = "autoram.account.cache.v1";
 function readAccountCache(userId: string): Row | null {
-  try { const raw = localStorage.getItem(ACCOUNT_CACHE_KEY); if (!raw) return null; const parsed = JSON.parse(raw) as { userId: string; account: Row }; return parsed.userId === userId ? parsed.account : null; } catch { return null; }
+  try { const raw = localStorage.getItem(ACCOUNT_CACHE_KEY); if (!raw) return null; const parsed = JSON.parse(raw) as { userId: string; account: Row }; return parsed.userId === userId && parsed.account && typeof parsed.account === "object" && Array.isArray(parsed.account.vehicles) ? parsed.account : null; } catch { return null; }
+}
+function writeAccountCache(userId: string, account: Row) {
+  try { localStorage.setItem(ACCOUNT_CACHE_KEY, JSON.stringify({ userId, at: Date.now(), account })); } catch { /* IndexedDB conserva los pendientes. */ }
+}
+const collections: Record<string, { key: string; map: (row: Row) => Row }> = {
+  fuel_entries: { key: "fuel", map: fuelOut }, maintenance_entries: { key: "maintenance", map: maintenanceOut },
+  trips: { key: "trips", map: tripOut }, service_quotes: { key: "quotes", map: quoteOut }, vehicle_documents: { key: "documents", map: documentOut },
+};
+async function cacheConfirmedInsert(userId: string, table: string, row: Row) {
+  const account = readAccountCache(userId), collection = collections[table];
+  if (!account || !collection || Number(account.activeVehicleId) !== Number(row.vehicle_id)) return;
+  const records = (account[collection.key] || []) as Row[];
+  account[collection.key] = [{ ...collection.map(row), clientId: row.client_id }, ...records.filter(record => record.id !== row.id && record.clientId !== row.client_id)];
+  account.summary = null;
+  writeAccountCache(userId, account);
+}
+async function withPending(account: Row, userId: string): Promise<Row> {
+  const merged = { ...account }, activeId = Number(account.activeVehicleId);
+  for (const item of await outbox.pendingItems(userId)) {
+    const collection = collections[item.table];
+    if (item.op === "insert" && collection && Number(item.payload.vehicle_id) === activeId) {
+      const records = (merged[collection.key] || []) as Row[];
+      if (!records.some(record => record.clientId === item.id || record.id === item.local_id)) {
+        merged[collection.key] = [{ ...collection.map({ ...item.payload, id: item.local_id, created_at: new Date(item.created_at).toISOString() } as Row), clientId: item.id }, ...records];
+      }
+      merged.summary = null;
+    } else if (item.op === "update" && item.table === "work_sessions") {
+      merged.work = ((merged.work || []) as Row[]).map(record => Number(record.id) === Number(item.match?.id) ? { ...record, endedAt: item.payload.ended_at as string, endOdometer: item.payload.end_odometer as number, income: item.payload.income as number, expenses: item.payload.expenses as number } : record);
+      merged.summary = null;
+    }
+  }
+  return merged;
 }
 
 async function actor() {
@@ -73,6 +119,19 @@ async function activeVehicleId(supabase: SupabaseClient, userId: string) {
   const first = await supabase.from("vehicles").select("id").eq("user_id", userId).order("created_at").limit(1).maybeSingle();
   if (first.error) fail(first.error);
   return first.data?.id ? Number(first.data.id) : null;
+}
+async function vehicleForWrite(supabase: SupabaseClient, userId: string, requested: RowValue | undefined) {
+  const cached = readAccountCache(userId);
+  const id = Number(requested || cached?.activeVehicleId);
+  if (id && ((cached?.vehicles || []) as Row[]).some(vehicle => Number(vehicle.id) === id)) return id;
+  if (typeof navigator !== "undefined" && !navigator.onLine) throw new Error("Abre este vehículo con conexión antes de registrar sin señal.");
+  if (requested) {
+    const result = await supabase.from("vehicles").select("id").eq("id", Number(requested)).eq("user_id", userId).maybeSingle();
+    if (result.error) fail(result.error);
+    if (!result.data) throw new Error("Vehículo no disponible.");
+    return Number(result.data.id);
+  }
+  return activeVehicleId(supabase, userId);
 }
 
 async function loadAccount(supabase: SupabaseClient, userId: string) {
@@ -97,7 +156,8 @@ async function loadAccount(supabase: SupabaseClient, userId: string) {
     loadSummary(supabase, activeId),
   ]);
   for (const result of [fuel, maintenance, work, trips, quotes, documents]) if (result.error) fail(result.error);
-  return { driver: driverOut(driverResult.data), vehicle: activeVehicle, vehicles, activeVehicleId: activeId, fuel: (fuel.data || []).map(fuelOut), maintenance: (maintenance.data || []).map(maintenanceOut), work: (work.data || []).map(workOut), trips: (trips.data || []).map(tripOut), quotes: (quotes.data || []).map(quoteOut), documents: (documents.data || []).map(documentOut), summary };
+  const mapped = (rows: Row[], map: (row: Row) => Row) => rows.map(row => ({ ...map(row), clientId: row.client_id }));
+  return { driver: driverOut(driverResult.data), vehicle: activeVehicle, vehicles, activeVehicleId: activeId, fuel: mapped(fuel.data || [], fuelOut), maintenance: mapped(maintenance.data || [], maintenanceOut), work: (work.data || []).map(workOut), trips: mapped(trips.data || [], tripOut), quotes: mapped(quotes.data || [], quoteOut), documents: mapped(documents.data || [], documentOut), summary };
 }
 
 async function saveAction(supabase: SupabaseClient, userId: string, action: string, d: Row) {
@@ -123,7 +183,26 @@ async function saveAction(supabase: SupabaseClient, userId: string, action: stri
     const result = await supabase.from("vehicle_selections").upsert({ user_id: userId, vehicle_id: id, updated_at: now }, { onConflict: "user_id" });
     if (result.error) fail(result.error); return { ok: true, activeVehicleId: id };
   }
-  const vehicleId = await activeVehicleId(supabase, userId); if (!vehicleId) throw new Error("Registra primero un vehículo.");
+  if (action === "finishWork") {
+    const values = { ended_at: now, end_odometer: Number(d.endOdometer), income: Number(d.income), expenses: Number(d.expenses) };
+    const id = `work-finish:${userId}:${Number(d.id)}`;
+    await outbox.enqueue({ id, table: "work_sessions", op: "update", match: { id: Number(d.id), user_id: userId }, payload: values }, { autoFlush: false });
+    if (typeof navigator !== "undefined" && !navigator.onLine) return { ok: true, endedAt: now, queued: true };
+    try {
+      const result = await supabase.from("work_sessions").update(values).eq("id", Number(d.id)).eq("user_id", userId).select("id").maybeSingle();
+      if (result.error) fail(result.error);
+      if (!result.data) throw new Error("La jornada no existe o no está disponible.");
+      const account = readAccountCache(userId);
+      if (account) { writeAccountCache(userId, await withPending(account, userId)); }
+      await outbox.acknowledge(id);
+      return { ok: true, endedAt: now };
+    } catch (error) {
+      await outbox.recordFailure(id, error);
+      if (isNetworkError(asError(error))) return { ok: true, endedAt: now, queued: true };
+      fail(error);
+    }
+  }
+  const vehicleId = await vehicleForWrite(supabase, userId, d.vehicleId); if (!vehicleId) throw new Error("Registra primero un vehículo.");
   if (action === "addFuel") {
     const saved = await insertOrQueue(supabase, "fuel_entries", { user_id: userId, vehicle_id: vehicleId, occurred_at: d.occurredAt, odometer: Number(d.odometer), station: d.station, fuel_type: d.fuelType, gallons: Number(d.gallons), price_per_gallon: Number(d.pricePerGallon), total: Number(d.total), payment: d.payment || null, fill_type: d.fillType || null, notes: d.notes || null });
     return { ok: true, id: saved.id, queued: saved.queued, record: d };
@@ -133,19 +212,13 @@ async function saveAction(supabase: SupabaseClient, userId: string, action: stri
     return { ok: true, id: saved.id, queued: saved.queued, record: d };
   }
   if (action === "startWork") {
+    if (typeof navigator !== "undefined" && !navigator.onLine) throw new Error("Necesitas conexión para iniciar una jornada. Puedes registrar recorridos y gastos sin señal.");
     const result = await supabase.from("work_sessions").insert({ user_id: userId, vehicle_id: vehicleId, role: d.role, platforms: d.platforms || [], activity: d.activity || null, started_at: now, start_odometer: Number(d.odometer) }).select("*").single();
     if (result.error) fail(result.error); return { ok: true, record: workOut(result.data) };
   }
-  if (action === "finishWork") {
-    const values = { ended_at: now, end_odometer: Number(d.endOdometer), income: Number(d.income), expenses: Number(d.expenses) };
-    if (typeof navigator !== "undefined" && !navigator.onLine) { await outbox.enqueue({ table: "work_sessions", op: "update", match: { id: Number(d.id), user_id: userId }, payload: values }); return { ok: true, endedAt: now, queued: true }; }
-    const result = await supabase.from("work_sessions").update(values).eq("id", Number(d.id)).eq("user_id", userId).is("ended_at", null).select("id").maybeSingle();
-    if (result.error && isNetworkError(result.error)) { await outbox.enqueue({ table: "work_sessions", op: "update", match: { id: Number(d.id), user_id: userId }, payload: values }); return { ok: true, endedAt: now, queued: true }; }
-    if (result.error) fail(result.error); if (!result.data) throw new Error("La jornada ya estaba cerrada o no existe."); return { ok: true, endedAt: now };
-  }
   if (action === "addTrip") {
     const route = Array.isArray(d.routePoints) && d.routePoints.length > 1 ? d.routePoints : null;
-    const saved = await insertOrQueue(supabase, "trips", { user_id: userId, vehicle_id: vehicleId, started_at: d.startedAt, ended_at: d.endedAt, duration_seconds: Number(d.durationSeconds), distance_km: Number(d.distanceKm), start_lat: d.startLat, start_lng: d.startLng, end_lat: d.endLat, end_lng: d.endLng, route_points: route, point_count: route ? route.length : null, max_speed_kmh: d.maxSpeedKmh ?? null, avg_speed_kmh: d.avgSpeedKmh ?? null, source: "gps" });
+    const saved = await insertOrQueue(supabase, "trips", { user_id: userId, vehicle_id: vehicleId, started_at: d.startedAt, ended_at: d.endedAt, duration_seconds: Number(d.durationSeconds), distance_km: Number(d.distanceKm), start_lat: d.startLat, start_lng: d.startLng, end_lat: d.endLat, end_lng: d.endLng, route_points: route, point_count: route ? route.length : null, max_speed_kmh: d.maxSpeedKmh ?? null, avg_speed_kmh: d.avgSpeedKmh ?? null, source: "gps" }, typeof d.clientId === "string" ? d.clientId : undefined);
     return { ok: true, id: saved.id, queued: saved.queued, record: d };
   }
   if (action === "saveQuote") {
@@ -173,24 +246,26 @@ async function uploadImage(init: RequestInit, supabase: SupabaseClient, userId: 
 export async function autoramFetch(input: RequestInfo | URL, init: RequestInit = {}) {
   const pathname = new URL(typeof input === "string" ? input : input.toString(), window.location.origin).pathname;
   if (pathname !== "/api/autoram" && pathname !== "/api/upload") return fetch(input, init);
-  const current = await actor(); if (!current) return json({ error: "Inicia sesión para usar Autoram." }, 401);
   try {
+    const current = await actor(); if (!current) return json({ error: "Inicia sesión para usar Autoram." }, 401);
     if (pathname === "/api/upload") return uploadImage(init, current.supabase, current.userId);
     if ((init.method || "GET").toUpperCase() === "GET") {
       // Sin señal, la app abre con la última copia de la cuenta y sigue funcionando.
       try {
-        const account = await loadAccount(current.supabase, current.userId);
-        try { localStorage.setItem(ACCOUNT_CACHE_KEY, JSON.stringify({ userId: current.userId, at: Date.now(), account })); } catch { /* sin espacio */ }
-        return json(account);
-      } catch (error) {
-        if (!isNetworkError(error as Error)) throw error;
         const cached = readAccountCache(current.userId);
-        if (cached) return json({ ...cached, offline: true });
+        if (typeof navigator !== "undefined" && !navigator.onLine && cached) return json({ ...await withPending(cached, current.userId), offline: true });
+        const account = await loadAccount(current.supabase, current.userId);
+        writeAccountCache(current.userId, account as Row);
+        return json(await withPending(account as Row, current.userId));
+      } catch (error) {
+        if (!isNetworkError(asError(error))) throw error;
+        const cached = readAccountCache(current.userId);
+        if (cached) return json({ ...await withPending(cached, current.userId), offline: true });
         throw error;
       }
     }
     const body = JSON.parse(String(init.body || "{}")) as { action?: string; data?: Row };
     if (!body.action) return json({ error: "Acción no válida." }, 400);
     return json(await saveAction(current.supabase, current.userId, body.action, body.data || {}), 201);
-  } catch (error) { return json({ error: error instanceof Error ? error.message : "No fue posible guardar." }, 500); }
+  } catch (error) { return json({ error: asError(error, "No fue posible guardar.").message }, 500); }
 }

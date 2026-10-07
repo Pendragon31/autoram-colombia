@@ -149,4 +149,7 @@ begin
   );
 end $$;
 
+revoke all on public.vehicle_fuel_stats, public.work_session_profitability from anon;
+grant select on public.vehicle_fuel_stats, public.work_session_profitability to authenticated;
+revoke execute on function public.dashboard_summary(bigint, integer) from public, anon;
 grant execute on function public.dashboard_summary(bigint, integer) to authenticated;

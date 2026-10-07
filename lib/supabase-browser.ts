@@ -24,7 +24,23 @@ export function getSupabaseBrowserClient() {
 function json(data: unknown, status = 200) { return new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json" } }); }
 function fail(error: unknown): never { throw asError(error); }
 function driverOut(row: Row | null) { return row ? { fullName: row.full_name, document: row.document, phone: row.phone, email: row.email || "", city: row.city, address: row.address || "", license: row.license, category: row.category } : null; }
-function vehicleOut(row: Row | null) { return row ? { id: Number(row.id), type: row.type, brand: row.brand, model: row.model, version: row.version || "", year: String(row.year), plate: row.plate, color: row.color || "", fuel: row.fuel, transmission: row.transmission, odometer: String(row.odometer), tires: row.tires, brakes: row.brakes, fluids: row.fluids, battery: row.battery, general: row.general, vin: row.vin || "", imageUrl: row.image_url || "", imageAttribution: row.image_attribution || "" } : null; }
+const PRIVATE_IMAGE_PREFIX = "storage://vehicle-images/";
+function vehicleOut(row: Row | null) {
+  if (!row) return null;
+  const storedImage = String(row.image_url || "");
+  const imageStoragePath = storedImage.startsWith(PRIVATE_IMAGE_PREFIX) ? storedImage.slice(PRIVATE_IMAGE_PREFIX.length) : "";
+  return { id: Number(row.id), type: row.type, brand: row.brand, model: row.model, version: row.version || "", year: String(row.year), plate: row.plate, color: row.color || "", fuel: row.fuel, transmission: row.transmission, odometer: String(row.odometer), tires: row.tires, brakes: row.brakes, fluids: row.fluids, battery: row.battery, general: row.general, vin: row.vin || "", imageUrl: imageStoragePath ? "" : storedImage, imageStoragePath, imageAttribution: row.image_attribution || "" };
+}
+async function vehicleWithImage(supabase: SupabaseClient, row: Row | null) {
+  const vehicle = vehicleOut(row);
+  if (vehicle?.imageStoragePath) {
+    try {
+      const result = await supabase.storage.from("vehicle-images").createSignedUrl(vehicle.imageStoragePath, 3600);
+      if (!result.error && result.data) vehicle.imageUrl = result.data.signedUrl;
+    } catch { /* El resto del vehículo sigue disponible si falla la foto. */ }
+  }
+  return vehicle;
+}
 function fuelOut(row: Row) { return { id: Number(row.id), vehicleId: Number(row.vehicle_id), occurredAt: row.occurred_at, odometer: Number(row.odometer), station: row.station, fuelType: row.fuel_type, gallons: Number(row.gallons), pricePerGallon: Number(row.price_per_gallon), total: Number(row.total), payment: row.payment || "", fillType: row.fill_type || "", notes: row.notes || "" }; }
 function maintenanceOut(row: Row) { return { id: Number(row.id), vehicleId: Number(row.vehicle_id), occurredAt: row.occurred_at, odometer: Number(row.odometer), movementType: row.movement_type, category: row.category, issue: row.issue, workDone: row.work_done, shop: row.shop, phone: row.phone || "", laborCost: Number(row.labor_cost), partsCost: Number(row.parts_cost), total: Number(row.total), warranty: row.warranty || "", nextKm: row.next_km === null ? null : Number(row.next_km), notes: row.notes || "" }; }
 function workOut(row: Row) { return { id: Number(row.id), vehicleId: Number(row.vehicle_id), role: row.role, platforms: JSON.stringify(row.platforms || []), activity: row.activity || "", startedAt: row.started_at, endedAt: row.ended_at, startOdometer: Number(row.start_odometer), endOdometer: row.end_odometer === null ? null : Number(row.end_odometer), income: Number(row.income), expenses: Number(row.expenses) }; }
@@ -141,7 +157,7 @@ async function loadAccount(supabase: SupabaseClient, userId: string) {
     supabase.from("vehicle_selections").select("vehicle_id").eq("user_id", userId).maybeSingle(),
   ]);
   if (driverResult.error) fail(driverResult.error); if (vehiclesResult.error) fail(vehiclesResult.error); if (selectionResult.error) fail(selectionResult.error);
-  const vehicles = (vehiclesResult.data || []).map(vehicleOut).filter(Boolean) as NonNullable<ReturnType<typeof vehicleOut>>[];
+  const vehicles = (await Promise.all((vehiclesResult.data || []).map(row => vehicleWithImage(supabase, row)))).filter(Boolean) as NonNullable<ReturnType<typeof vehicleOut>>[];
   const selectedId = Number(selectionResult.data?.vehicle_id || 0);
   const activeId = vehicles.some(item => item.id === selectedId) ? selectedId : (vehicles[0]?.id || null);
   const activeVehicle = vehicles.find(item => item.id === activeId) || null;
@@ -167,13 +183,13 @@ async function saveAction(supabase: SupabaseClient, userId: string, action: stri
     if (result.error) fail(result.error); return { ok: true, driver: d };
   }
   if (action === "saveVehicle" || action === "addVehicle") {
-    const values = { user_id: userId, type: d.type, brand: d.brand, model: d.model, version: d.version || null, year: Number(d.year), plate: String(d.plate).toUpperCase(), color: d.color || null, fuel: d.fuel, transmission: d.transmission, odometer: Number(d.odometer), tires: d.tires, brakes: d.brakes, fluids: d.fluids, battery: d.battery, general: d.general, vin: d.vin || null, image_url: d.imageUrl || null, image_attribution: d.imageAttribution || null, updated_at: now };
+    const values = { user_id: userId, type: d.type, brand: d.brand, model: d.model, version: d.version || null, year: Number(d.year), plate: String(d.plate).toUpperCase(), color: d.color || null, fuel: d.fuel, transmission: d.transmission, odometer: Number(d.odometer), tires: d.tires, brakes: d.brakes, fluids: d.fluids, battery: d.battery, general: d.general, vin: d.vin || null, image_url: d.imageStoragePath ? PRIVATE_IMAGE_PREFIX + String(d.imageStoragePath) : d.imageUrl || null, image_attribution: d.imageAttribution || null, updated_at: now };
     let saved: Row | null = null;
     if (d.id) { const result = await supabase.from("vehicles").update(values).eq("id", Number(d.id)).eq("user_id", userId).select("*").single(); if (result.error) fail(result.error); saved = result.data; }
     else { const result = await supabase.from("vehicles").insert(values).select("*").single(); if (result.error) fail(result.error); saved = result.data; }
     if (!saved) throw new Error("No pudimos guardar el vehículo.");
     const selection = await supabase.from("vehicle_selections").upsert({ user_id: userId, vehicle_id: saved.id, updated_at: now }, { onConflict: "user_id" });
-    if (selection.error) fail(selection.error); return { ok: true, vehicle: vehicleOut(saved), id: Number(saved.id) };
+    if (selection.error) fail(selection.error); return { ok: true, vehicle: await vehicleWithImage(supabase, saved), id: Number(saved.id) };
   }
   if (action === "selectVehicle") {
     const id = Number(d.id); const vehicle = await supabase.from("vehicles").select("id").eq("id", id).eq("user_id", userId).maybeSingle();
@@ -240,7 +256,9 @@ async function uploadImage(init: RequestInit, supabase: SupabaseClient, userId: 
   const key = `${userId}/${crypto.randomUUID()}.${extension}`;
   const result = await supabase.storage.from("vehicle-images").upload(key, file, { contentType: file.type, upsert: false });
   if (result.error) fail(result.error);
-  return json({ url: supabase.storage.from("vehicle-images").getPublicUrl(key).data.publicUrl, key });
+  const signed = await supabase.storage.from("vehicle-images").createSignedUrl(key, 3600);
+  if (signed.error) fail(signed.error);
+  return json({ url: signed.data.signedUrl, key });
 }
 
 export async function autoramFetch(input: RequestInfo | URL, init: RequestInit = {}) {

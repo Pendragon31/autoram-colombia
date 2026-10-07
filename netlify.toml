@@ -4,6 +4,9 @@ publish = "out"
 
 [build.environment]
 NODE_VERSION = "22"
+# Public browser connection. Owner policies protect access to account data.
+NEXT_PUBLIC_SUPABASE_URL = "https://nfvkoehoxmbrjnvxewdf.supabase.co"
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_ZtjSaIaBSYpCjHLFVu_Zyg_TGXtfkDP"
 
 [[headers]]
 for = "/*"

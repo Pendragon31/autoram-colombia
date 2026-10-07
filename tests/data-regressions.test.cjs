@@ -3,10 +3,10 @@ const assert = require('node:assert/strict');
 const { evaluate, errors, offlineStore } = require('./helpers.cjs');
 const cacheKey = 'autoram.account.cache.v1';
 const account = { driver: { fullName: 'Test' }, vehicle: { id: 7 }, vehicles: [{ id: 7 }], activeVehicleId: 7, fuel: [], maintenance: [], trips: [], quotes: [], documents: [], work: [{ id: 42, vehicleId: 7, endedAt: null }], summary: { stale: true } };
-function setup({ online = false, owner = 'owner', cached = account, cachedOwner = 'owner', query } = {}) {
+function setup({ online = false, owner = 'owner', cached = account, cachedOwner = 'owner', query, storage } = {}) {
   const navigator = { onLine: online }, store = offlineStore({ navigator }), memory = new Map(); let requests = 0;
   if (cached) memory.set(cacheKey, JSON.stringify({ userId: cachedOwner, account: cached }));
-  const client = { auth: { getSession: async () => ({ data: { session: { user: { id: owner } } }, error: null }) }, from(table) {
+  const client = { storage, auth: { getSession: async () => ({ data: { session: { user: { id: owner } } }, error: null }) }, from(table) {
     requests++; if (!query) throw { message: 'Failed to fetch', code: 'NETWORK' }; return query(table, store);
   } };
   const api = evaluate('lib/supabase-browser.ts', id => id.includes('supabase-js') ? { createClient: () => client } : id.includes('errors') ? errors : store,
@@ -44,4 +44,31 @@ test('production build refuses missing public configuration and secret keys', ()
     const config = evaluate('next.config.ts', () => ({ PHASE_PRODUCTION_BUILD: 'build' }), { process: { env } }).default;
     assert.throws(() => config('build'));
   }
+});
+test('saving a private vehicle photo persists its object path and refreshes its temporary URL', async () => {
+  let persisted;
+  const env = setup({ online: true, storage: { from: bucket => {
+    assert.equal(bucket, 'vehicle-images');
+    return { createSignedUrl: async (path, seconds) => {
+      assert.equal(path, 'owner/photo.jpg'); assert.equal(seconds, 3600);
+      return { data: { signedUrl: 'https://storage.test/fresh' }, error: null };
+    } };
+  } }, query: table => table === 'vehicles' ? { insert: values => {
+    persisted = values.image_url;
+    return { select: () => ({ single: async () => ({ data: { ...values, id: 7 }, error: null }) }) };
+  } } : { upsert: async () => ({ error: null }) } });
+  const response = await env.post('addVehicle', { type: 'Carro', year: '2024', plate: 'ABC123', odometer: '0', imageUrl: 'https://storage.test/expired', imageStoragePath: 'owner/photo.jpg' });
+  const body = await response.json();
+  assert.equal(response.status, 201); assert.equal(persisted, 'storage://vehicle-images/owner/photo.jpg');
+  assert.equal(body.vehicle.imageUrl, 'https://storage.test/fresh'); assert.equal(body.vehicle.imageStoragePath, 'owner/photo.jpg');
+});
+test('an inaccessible private photo does not block loading the rest of the account', async () => {
+  const env = setup({ online: true, storage: { from: () => ({ createSignedUrl: async () => ({ data: null, error: { message: 'Not authorized' } }) }) }, query: table => {
+    const result = { data: table === 'vehicles' ? [{ id: 7, image_url: 'storage://vehicle-images/owner/photo.jpg' }] : [], error: null };
+    const builder = { select: () => builder, eq: () => builder, order: () => builder, limit: () => builder, maybeSingle: async () => ({ data: null, error: null }), then: (resolve, reject) => Promise.resolve(result).then(resolve, reject) };
+    return builder;
+  } });
+  const response = await env.api.autoramFetch('/api/autoram'); const body = await response.json();
+  assert.equal(response.status, 200); assert.equal(body.vehicles[0].id, 7); assert.equal(body.vehicles[0].imageUrl, '');
+  assert.equal(body.vehicles[0].imageStoragePath, 'owner/photo.jpg');
 });

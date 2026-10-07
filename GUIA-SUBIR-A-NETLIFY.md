@@ -30,8 +30,8 @@ Necesitas tener Node.js 22 instalado en el computador.
 npm install
 npx netlify login
 npx netlify link --id 15af3446-32e9-46d8-bd93-0d97d2a5ea97
-npx netlify env:set NEXT_PUBLIC_SUPABASE_URL https://icgvbjtkzsjsctvhasid.supabase.co
-npx netlify env:set NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY sb_publishable_avqtTMy9GYw5ZVqawBZw1A_urWJUKE0
+npx netlify env:set NEXT_PUBLIC_SUPABASE_URL https://nfvkoehoxmbrjnvxewdf.supabase.co
+npx netlify env:set NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY sb_publishable_ZtjSaIaBSYpCjHLFVu_Zyg_TGXtfkDP
 npx netlify deploy --build --prod
 ```
 

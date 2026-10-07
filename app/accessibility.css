@@ -13,6 +13,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 
 .location-share{display:flex;gap:16px;align-items:center;justify-content:space-between;margin:16px 0;padding:18px}.location-share p{margin:6px 0;color:#aab4aa;font-size:13px}.location-share button{flex-shrink:0}@media(max-width:600px){.location-share{align-items:stretch;flex-direction:column}}
 
+.auth-password-control{display:grid;gap:7px}
 .password-field{position:relative}
 .auth-form .password-field input{padding-right:58px}
 .password-toggle{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:44px;height:44px;display:grid;place-items:center;border:0;border-radius:9px;background:transparent;color:#b8c2bc;cursor:pointer}

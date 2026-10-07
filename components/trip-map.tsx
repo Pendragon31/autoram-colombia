@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import maplibregl, { type Map as MLMap, type GeoJSONSource } from 'maplibre-gl';
 
 import { LocateFixed } from "lucide-react";
+import CanvasMap from "@/components/canvas-map";
+import { canUseWebGL } from "@/lib/map-capabilities";
 import { mapStyle } from "@/lib/map-style";
 import { routeBounds, type TrackPoint } from "@/lib/geo";
 
@@ -51,6 +53,7 @@ export default function TripMap({ points, live = false, className = '', height =
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<MLMap | null>(null);
   const ready = useRef(false);
+  const [fallback,setFallback] = useState(false);
   const userMoved = useRef(false);
   const [following,setFollowing] = useState(true);
   const latest = useRef({points,plannedRoute});
@@ -59,7 +62,9 @@ export default function TripMap({ points, live = false, className = '', height =
   // Crear el mapa una sola vez
   useEffect(() => {
     if (!container.current || map.current) return;
-    const m = new maplibregl.Map({
+    if(!canUseWebGL()){const timer=setTimeout(()=>setFallback(true),0);return()=>clearTimeout(timer);}
+    let m: MLMap;
+    try {m = new maplibregl.Map({
       container: container.current,
       style: mapStyle(true),
       center: fallbackCenter ?? (live ? [-73.635,4.105] : COLOMBIA_CENTER),
@@ -67,6 +72,7 @@ export default function TripMap({ points, live = false, className = '', height =
       attributionControl: { compact: true },
       cooperativeGestures: !live, // en listado no secuestra el scroll del dedo
     });
+    }catch {container.current.replaceChildren();const timer=setTimeout(()=>setFallback(true),0);return()=>clearTimeout(timer);}
     m.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'top-right');
     if (live) {
       m.on('dragstart', () => { userMoved.current = true; setFollowing(false); });
@@ -122,8 +128,8 @@ export default function TripMap({ points, live = false, className = '', height =
 
   return (
     <div className={`trip-map ${live ? 'trip-map--live' : ''} ${className}`} style={{ height }}>
-      <div ref={container} className="trip-map__canvas" />
-      {live && <button type="button" className={`trip-map__recenter ${following?'is-following':''}`} aria-label="Centrar mi ubicación y seguir el recorrido" aria-pressed={following} disabled={!points.length} onClick={()=>{userMoved.current=false;setFollowing(true);if(map.current&&ready.current)applyPoints(map.current,points,live,false,false,plannedRoute);}}><LocateFixed size={21}/></button>}
+      {fallback?<CanvasMap center={fallbackCenter??[-73.635,4.105]} zoom={live?15:13} dark points={points} live={live} route={plannedRoute}/>:<div ref={container} className="trip-map__canvas" />}
+      {live && !fallback && <button type="button" className={`trip-map__recenter ${following?'is-following':''}`} aria-label="Centrar mi ubicación y seguir el recorrido" aria-pressed={following} disabled={!points.length} onClick={()=>{userMoved.current=false;setFollowing(true);if(map.current&&ready.current)applyPoints(map.current,points,live,false,false,plannedRoute);}}><LocateFixed size={21}/></button>}
       {points.length === 0 && !plannedRoute?.length && !live && (
         <div className="trip-map__empty">
           {live ? 'Buscando señal de GPS…' : 'Este viaje no tiene ruta guardada.'}

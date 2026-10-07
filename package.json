@@ -18,6 +18,7 @@
   "dependencies": {
     "@base-ui/react": "^1.7.0",
     "@hookform/resolvers": "^5.7.1",
+    "@mapbox/vector-tile": "3.0.0",
     "@shadcn/react": "^0.3.0",
     "@supabase/supabase-js": "2.112.4",
     "class-variance-authority": "0.7.1",
@@ -31,6 +32,7 @@
     "maplibre-gl": "^5.6.0",
     "next": "16.2.6",
     "next-themes": "^0.4.6",
+    "pbf": "5.0.0",
     "pmtiles": "4.5.0",
     "radix-ui": "^1.6.7",
     "react": "19.2.6",

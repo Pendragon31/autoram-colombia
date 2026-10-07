@@ -1,23 +1,14 @@
 import maplibregl, { type StyleSpecification, type LayerSpecification } from 'maplibre-gl';
-import { FetchSource, PMTiles, Protocol } from 'pmtiles';
-import { MAP_REGIONS, readStoredRange, type MapRegion } from '@/lib/offline-maps';
+import { Protocol } from 'pmtiles';
+import { MAP_REGIONS, type MapRegion } from '@/lib/offline-maps';
 
+import { mapArchive } from '@/lib/map-archive';
 let registered = false;
 export function prepareMapProtocol() {
   if (registered) return;
   const protocol = new Protocol();
   for (const region of MAP_REGIONS) {
-    const url = new URL(region.path, window.location.origin).href;
-    const remote = new FetchSource(url);
-    protocol.add(new PMTiles({
-      getKey: () => url,
-      getBytes: async (offset, length, signal, etag) => {
-        const stored = await readStoredRange(region.id, offset, length, signal);
-        if (stored) return { data: stored };
-        if (!navigator.onLine) throw new Error(`Descarga ${region.name} antes de salir sin señal.`);
-        return remote.getBytes(offset, length, signal, etag);
-      },
-    }));
+    protocol.add(mapArchive(region));
   }
   maplibregl.addProtocol('pmtiles', protocol.tile);
   maplibregl.addProtocol('autoram-font', async (request, abort) => {

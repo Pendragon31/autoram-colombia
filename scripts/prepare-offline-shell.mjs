@@ -1,6 +1,7 @@
 import { readdir, readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
+import workerCode from './offline-shell-code.cjs';
 async function files(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
   return (await Promise.all(entries.map(entry => entry.isDirectory() ? files(path.join(directory, entry.name)) : [path.join(directory, entry.name)]))).flat();
@@ -10,5 +11,5 @@ const assets = built.filter(file => /\.(js|css|woff2?|ttf|png|svg|ico|webmanifes
 assets.push('/', '/mapas', '/maps/catalog.json');
 const buildId = createHash('sha256').update(assets.join('\n')).update(await readFile('out/index.html')).digest('hex').slice(0, 16);
 const template = await readFile('scripts/offline-worker.template.js', 'utf8');
-await writeFile('out/sw.js', template.replace('__VERSION__', buildId).replace('__ASSETS__', JSON.stringify(assets)));
+await writeFile('out/sw.js', workerCode(template, assets, buildId));
 console.log(`Offline app shell: ${assets.length} public assets, version ${buildId}`);

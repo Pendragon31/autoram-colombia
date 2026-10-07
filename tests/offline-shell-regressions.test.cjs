@@ -4,6 +4,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
+const workerCode = require('../scripts/offline-shell-code.cjs');
 function worker() {
   const events = new Map(), stores = new Map(), deleted = [], requests = [];
   const cache = name => ({ addAll: async urls => { stores.set(name, new Map(urls.map(url => [url, new Response(url === '/mapas' ? 'OFFLINE MAPS' : 'PUBLIC SHELL')]))); }, match: async request => stores.get(name)?.get(typeof request === 'string' ? request : new URL(request.url).pathname)?.clone() });
@@ -12,7 +13,7 @@ function worker() {
     caches: { open: async name => cache(name), keys: async () => ['autoram-app-previous', 'autoram-map-fonts-v1', 'unrelated-cache'], delete: async name => { deleted.push(name); }, match: async () => undefined },
     fetch: async request => { requests.push(request.url); throw new Error('offline'); }, URL, Response, AbortSignal,
   };
-  const source = fs.readFileSync('scripts/offline-worker.template.js', 'utf8').replace('__VERSION__', 'test-version').replace('__ASSETS__', JSON.stringify(['/', '/mapas', '/_next/static/example.js']));
+  const source = workerCode(fs.readFileSync('scripts/offline-worker.template.js', 'utf8'), ['/', '/mapas', '/_next/static/example.js'], 'test-version');
   vm.runInNewContext(source, globals);
   const dispatch = async (name, extra = {}) => { let pending; events.get(name)({ waitUntil: value => { pending = value; }, respondWith: value => { pending = value; }, ...extra }); return pending ? await pending : undefined; };
   return { dispatch, deleted, stores, requests };

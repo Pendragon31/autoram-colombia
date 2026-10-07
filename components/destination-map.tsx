@@ -5,9 +5,11 @@
 //  · Muestra tu ubicación, el destino y la ruta real por carretera cuando OSRM responde.
 //  · Estilo claro: aquí el conductor necesita leer nombres de calles.
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import maplibregl, { type Map as MLMap, type GeoJSONSource } from "maplibre-gl";
 
+import CanvasMap from "@/components/canvas-map";
+import { canUseWebGL } from "@/lib/map-capabilities";
 import { mapStyle } from "@/lib/map-style";
 
 export type LatLng = { lat: number; lng: number };
@@ -30,6 +32,7 @@ export default function DestinationMap({ origin, destination, route, onSelect, h
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<MLMap | null>(null);
   const ready = useRef(false);
+  const [fallback,setFallback] = useState(false);
   const originMarker = useRef<maplibregl.Marker | null>(null);
   const destMarker = useRef<maplibregl.Marker | null>(null);
   const onSelectRef = useRef(onSelect);
@@ -37,12 +40,15 @@ export default function DestinationMap({ origin, destination, route, onSelect, h
 
   useEffect(() => {
     if (!container.current || map.current) return;
+    if(!canUseWebGL()){const timer=setTimeout(()=>setFallback(true),0);return()=>clearTimeout(timer);}
     const start = destination ?? origin;
-    const m = new maplibregl.Map({
+    let m: MLMap;
+    try { m = new maplibregl.Map({
       container: container.current, style: mapStyle(false),
       center: start ? [start.lng, start.lat] : fallbackCenter ?? COLOMBIA_CENTER, zoom: start || fallbackCenter ? 14 : 5,
       attributionControl: { compact: true }, cooperativeGestures: true,
     });
+    } catch {container.current.replaceChildren();const timer=setTimeout(()=>setFallback(true),0);return()=>clearTimeout(timer);}
     m.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
     m.on("load", () => {
       m.addSource("route", { type: "geojson", data: lineOf([]) });
@@ -63,7 +69,8 @@ export default function DestinationMap({ origin, destination, route, onSelect, h
 
   return (
     <div className="destination-map" style={{ height }}>
-      <div ref={container} className="destination-map__canvas" />
+      {fallback&&<CanvasMap center={destination?[destination.lng,destination.lat]:origin?[origin.lng,origin.lat]:fallbackCenter??COLOMBIA_CENTER} zoom={fallbackCenter||origin||destination?14:8} origin={origin} destination={destination} route={route??undefined} onSelect={onSelect}/>}
+      {!fallback&&<div ref={container} className="destination-map__canvas" />}
       {!destination && <div className="destination-map__hint">Toca el lugar de destino</div>}
     </div>
   );

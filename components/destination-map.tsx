@@ -24,11 +24,12 @@ type Props = {
   onSelect: (point: LatLng) => void;
   height?: string;
   fallbackCenter?: [number, number];
+  selectionHint?: string;
 };
 
 const lineOf = (coords: [number, number][]): GeoJSON.Feature<GeoJSON.LineString> => ({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: coords } });
 
-export default function DestinationMap({ origin, destination, route, onSelect, height = "285px", fallbackCenter }: Props) {
+export default function DestinationMap({ origin, destination, route, onSelect, height = "285px", fallbackCenter, selectionHint = 'Toca el lugar de destino' }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<MLMap | null>(null);
   const ready = useRef(false);
@@ -71,7 +72,7 @@ export default function DestinationMap({ origin, destination, route, onSelect, h
     <div className="destination-map" style={{ height }}>
       {fallback&&<CanvasMap center={destination?[destination.lng,destination.lat]:origin?[origin.lng,origin.lat]:fallbackCenter??COLOMBIA_CENTER} zoom={fallbackCenter||origin||destination?14:8} origin={origin} destination={destination} route={route??undefined} onSelect={onSelect}/>}
       {!fallback&&<div ref={container} className="destination-map__canvas" />}
-      {!destination && <div className="destination-map__hint">Toca el lugar de destino</div>}
+      {!destination && <div className="destination-map__hint">{selectionHint}</div>}
     </div>
   );
 }

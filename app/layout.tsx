@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import OfflineShell from "@/components/offline-shell";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./globals.css";
 import "./autoram-brand.css";
@@ -7,6 +8,7 @@ import "./real-maps.css";
 import "./trip-map.css";
 import "./accessibility.css";
 import "./v19.css";
+import "./offline-navigation.css";
 
 const SITE_URL = "https://autoram-app-colombia.netlify.app";
 
@@ -42,5 +44,5 @@ export const metadata: Metadata = {
 export const viewport: Viewport = { themeColor: "#080B0A", width: "device-width", initialScale: 1 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="es"><body><noscript><p>Activa JavaScript para ingresar a AutoRAM.</p></noscript>{children}</body></html>;
+  return <html lang="es"><body><noscript><p>Activa JavaScript para ingresar a AutoRAM.</p></noscript>{children}<OfflineShell/></body></html>;
 }

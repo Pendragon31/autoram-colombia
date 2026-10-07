@@ -1,0 +1,110 @@
+.maps-page { max-width: 1240px; margin: auto; padding: 28px 32px 32px; color: #eef5ed; }
+.maps-page button, .maps-page select, .navigation-panel button, .navigation-panel select, .navigation-panel input { font: inherit; }
+.maps-page button, .navigation-panel button, .offline-manager button { cursor: pointer; }
+.maps-page button:disabled, .navigation-panel button:disabled, .offline-manager button:disabled { opacity: .45; cursor: default; }
+.maps-page__header, .maps-brand, .maps-back, .maps-tabs, .offline-manager__heading, .offline-region__details, .offline-region__actions, .maps-section-title, .route-planner__origin, .route-selection, .route-map-tools, .navigation-guide__top, .navigation-guide__remaining { display: flex; align-items: center; gap: 12px; }
+.maps-page__header { justify-content: space-between; padding-bottom: 24px; border-bottom: 1px solid #2b3730; }
+.maps-brand { text-decoration: none; color: inherit; font-weight: 850; font-size: 23px; letter-spacing: .06em; }
+.maps-brand small { display: block; font-size: 9px; color: #b8ff2c; letter-spacing: .3em; margin-top: 3px; }
+.maps-back { color: #bbc8be; text-decoration: none; font-size: 13px; }
+.maps-page__intro { padding: 44px 0 30px; max-width: 670px; }
+.maps-eyebrow { display: flex; gap: 8px; align-items: center; font-size: 11px; color: #b8ff2c; font-weight: 750; letter-spacing: .2em; }
+.maps-page__intro h1 { font-size: clamp(38px, 5vw, 64px); letter-spacing: -.045em; line-height: 1.05; margin: 18px 0; font-weight: 750; }
+.maps-page__intro h1 em { font-style: normal; color: #b8ff2c; }
+.maps-page__intro p { font-size: 16px; color: #a7b7aa; line-height: 1.7; max-width: 550px; }
+.maps-tabs { margin: 0 0 24px; border-bottom: 1px solid #2b3730; gap: 24px; }
+.maps-tabs button { display: flex; gap: 8px; align-items: center; background: none; color: #9eaea2; border: 0; border-bottom: 3px solid transparent; padding: 13px 0; font-weight: 650; font-size: 14px; }
+.maps-tabs button[aria-pressed=true] { color: #b8ff2c; border-bottom-color: #b8ff2c; }
+.maps-page__grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 24px; align-items: start; }
+.offline-manager { background: #121a15; border: 1px solid #2a3930; border-radius: 20px; padding: 24px; }
+.offline-manager__heading { align-items: start; margin-bottom: 20px; }
+.maps-icon { color: #b8ff2c; flex: 0 0 auto; background: #263522; border-radius: 13px; padding: 11px; display: flex; }
+.offline-manager__heading small { font-size: 9px; color: #b8ff2c; font-weight: 700; letter-spacing: .16em; }
+.offline-manager h2, .maps-section-title h2 { margin: 5px 0 7px; font-size: 23px; letter-spacing: -.025em; }
+.offline-manager__heading p, .maps-section-title p { font-size: 13px; color: #a7b7aa; line-height: 1.6; margin: 0; }
+.offline-regions { display: grid; gap: 10px; }
+.offline-region { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 12px; border: 1px solid #2b3830; border-radius: 13px; background: #18221b; }
+.offline-region.is-saved { border-color: #526f32; }
+.offline-region__details { gap: 9px; flex: 1; min-width: 180px; }
+.offline-region__details>svg { color: #a3ba9c; flex: 0 0 auto; }
+.offline-region h3 { font-size: 14px; margin: 0 0 4px; color: #eef5ed; }
+.offline-region p { font-size: 11px; color: #9cae9f; margin: 0 0 6px; line-height: 1.4; }
+.offline-region small { font-size: 11px; display: flex; align-items: center; gap: 4px; color: #bbd2b0; }
+.maps-download, .maps-primary { display: inline-flex; align-items: center; justify-content: center; gap: 7px; color: #14200b; border: 0; border-radius: 10px; background: #b8ff2c; padding: 11px 13px; font-size: 12px; font-weight: 750; min-height: 42px; }
+.maps-secondary, .maps-icon-button { color: #d3dfd3; border: 1px solid #3d5041; border-radius: 9px; padding: 9px 11px; background: #202e23; font-size: 12px; min-height: 40px; }
+.maps-icon-button { display: inline-flex; align-items: center; justify-content: center; }
+.offline-region__progress { display: flex; flex: 1 0 100%; align-items: center; gap: 10px; font-size: 12px; }
+.offline-region__progress progress { flex: 1; width: 50%; height: 8px; accent-color: #b8ff2c; }
+.offline-region__progress button { background: none; border: 0; color: #b8cdb8; display: flex; padding: 8px; }
+.maps-footnote { font-size: 11px; color: #94a498; line-height: 1.7; margin: 16px 0 0; }
+.maps-error, .maps-notice { color: #f0c4a8; background: #3b2820; border: 1px solid #604130; padding: 13px; border-radius: 11px; font-size: 13px; line-height: 1.5; }
+.maps-success { color: #c4ecad; padding: 12px; border-radius: 10px; background: #26371f; font-size: 13px; }
+.maps-offline-status { display: flex; align-items: center; gap: 7px; font-size: 11px; line-height: 1.6; color: #bbd2b0; margin: 18px 0 0; }
+.maps-preview { overflow: hidden; border: 1px solid #304034; border-radius: 20px; background: #18221b; }
+.maps-preview__heading { padding: 20px; }
+.maps-preview__heading span { display: block; color: #a9bca5; font-size: 10px; font-weight: 700; letter-spacing: .14em; margin-bottom: 9px; }
+.maps-preview select, .route-map-tools select { color: #eaf5e7; background: #202e23; border: 1px solid #3d5041; padding: 9px; border-radius: 9px; max-width: 100%; }
+.region-map { height: 390px; width: 100%; }
+.maps-preview>p { padding: 12px 18px; font-size: 11px; color: #9fb09e; line-height: 1.6; margin: 0; }
+.maps-page__footer { color: #778c7b; font-size: 11px; margin-top: 30px; line-height: 1.8; }
+.maps-page__footer a { color: #a6bfa2; }
+.navigation-panel { display: grid; gap: 16px; margin: 0 0 20px; }
+.maps-download-details { border: 1px solid #2f4436; border-radius: 13px; background: #141e17; }
+.maps-download-details>summary { display: flex; gap: 9px; align-items: center; padding: 15px; cursor: pointer; font-size: 14px; font-weight: 650; list-style: none; }
+.maps-download-details>summary>svg { color: #b8ff2c; }
+.maps-download-details>summary span { margin-left: auto; font-size: 11px; font-weight: 400; color: #a2bd9c; }
+.offline-manager--compact { border: 0; border-top: 1px solid #2f4436; border-radius: 0 0 13px 13px; }
+.route-planner, .navigation-guide { padding: 20px; border: 1px solid #2d3e33; border-radius: 17px; background: #141e17; }
+.maps-section-title { align-items: start; margin-bottom: 18px; color: #b8ff2c; }
+.maps-section-title h2 { color: #eef5ed; }
+.route-planner__origin { flex-wrap: wrap; margin-bottom: 12px; }
+.route-planner__origin button { display: inline-flex; align-items: center; gap: 6px; min-height: 42px; border: 1px solid #3c5141; border-radius: 9px; background: #213126; color: #cde0c6; padding: 9px 12px; font-size: 12px; }
+.route-planner__origin button.is-selected { border-color: #b8ff2c; }
+.route-search form { display: flex; margin: 0; gap: 8px; }
+.route-search input { flex: 1; min-width: 0; color: #f1f7ed; background: #0e1811; border: 1px solid #344738; border-radius: 10px; padding: 12px; font-size: 13px; min-height: 44px; }
+.route-search form button { display: flex; align-items: center; justify-content: center; gap: 5px; border: 1px solid #3c5141; border-radius: 10px; background: #213126; color: #d3e7c6; padding: 10px 12px; font-size: 12px; }
+.route-search__results { list-style: none; margin: 8px 0; padding: 0; border: 1px solid #344738; border-radius: 10px; }
+.route-search__results button { display: flex; gap: 8px; width: 100%; align-items: center; border: 0; border-bottom: 1px solid #344738; background: none; color: #cde0c6; text-align: left; padding: 12px; font-size: 12px; }
+.route-map-tools { justify-content: space-between; margin: 12px 0; font-size: 11px; flex-wrap: wrap; }
+.route-map-tools label { color: #aac2a3; }
+.route-map-tools select { font-size: 12px; margin-left: 5px; }
+.route-map-tools>span { color: #b8ff2c; }
+.route-planner .destination-map { border-radius: 12px; height: 300px; }
+.route-selection { margin: 14px 0; font-size: 12px; color: #adbfaa; }
+.route-selection span { display: flex; align-items: center; gap: 6px; overflow-wrap: anywhere; }
+.route-selection i { border-radius: 50%; height: 8px; width: 8px; background: #596f59; flex: 0 0 auto; }
+.route-selection i.selected { background: #b8ff2c; }
+.route-plan-button { width: 100%; font-size: 14px; }
+.navigation-guide { border-color: #4e733a; }
+.navigation-guide__top { justify-content: space-between; }
+.navigation-guide__top>span { display: flex; align-items: center; gap: 7px; font-size: 10px; letter-spacing: .08em; color: #a8c99c; max-width: 85%; line-height: 1.6; }
+.navigation-guide__instruction { padding: 18px 0; }
+.navigation-guide__distance { font-size: 27px; color: #b8ff2c; font-weight: 750; }
+.navigation-guide h2 { font-size: clamp(22px,3vw,32px); font-weight: 680; margin: 9px 0 0; line-height: 1.25; }
+.navigation-guide__remaining { justify-content: space-between; flex-wrap: wrap; color: #a8bc9f; font-size: 12px; padding: 13px 0; border-top: 1px solid #344c37; }
+.navigation-guide__remaining b { color: #f1f6ed; }
+.navigation-guide__remaining button { display: flex; gap: 6px; align-items: center; background: #213126; border: 1px solid #405e3e; border-radius: 9px; padding: 10px; color: #bfe99e; font-size: 12px; }
+.navigation-guide>.trip-map { margin-bottom: 14px; }
+.maps-notice { display: flex; align-items: start; gap: 8px; }
+.maps-notice svg { flex: 0 0 auto; margin-top: 2px; }
+.trip-map__recenter { position: absolute; right: 10px; top: 108px; z-index: 3; width: 38px; height: 38px; border: 1px solid #536844; border-radius: 9px; color: #c5d9b9; background: #172219; display: grid; place-items: center; cursor: pointer; }
+.trip-map__recenter.is-following { color: #b8ff2c; border-color: #8ac52d; }
+.trip-map__recenter:disabled { opacity: .4; cursor: default; }
+.nav-map-stage .trip-map__recenter { top: 182px; }
+.maps-loading { min-height: 280px; display: grid; place-items: center; color: #9db58f; background: #18221b; border-radius: 14px; }
+.auth-offline-link { color: #c1ea9c; font-size: 13px; display: block; margin-top: 22px; text-decoration: none; }
+@media (max-width: 800px) {
+  .maps-page { padding: 18px 18px 32px; }
+  .maps-page__intro { padding-top: 30px; }
+  .maps-page__intro p { font-size: 14px; }
+  .maps-page__grid { grid-template-columns: 1fr; gap: 18px; }
+  .offline-manager { padding: 18px; }
+  .region-map { height: 330px; }
+  .maps-back { font-size: 11px; gap: 4px; }
+  .maps-brand { font-size: 19px; gap: 8px; }
+  .maps-brand img { width: 35px; height: 35px; }
+  .maps-tabs { gap: 20px; }
+  .maps-tabs button { font-size: 13px; }
+  .route-planner,.navigation-guide { padding: 16px; }
+  .offline-region__details { min-width: 160px; }
+}

@@ -6,22 +6,11 @@
 //  · Estilo claro: aquí el conductor necesita leer nombres de calles.
 
 import { useEffect, useRef } from "react";
-import maplibregl, { type Map as MLMap, type GeoJSONSource, type StyleSpecification } from "maplibre-gl";
+import maplibregl, { type Map as MLMap, type GeoJSONSource } from "maplibre-gl";
+
+import { mapStyle } from "@/lib/map-style";
 
 export type LatLng = { lat: number; lng: number };
-
-const STYLE: StyleSpecification = {
-  version: 8,
-  sources: {
-    osm: {
-      type: "raster",
-      tiles: ["https://a.tile.openstreetmap.org/{z}/{x}/{y}.png", "https://b.tile.openstreetmap.org/{z}/{x}/{y}.png", "https://c.tile.openstreetmap.org/{z}/{x}/{y}.png"],
-      tileSize: 256, maxzoom: 19,
-      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    },
-  },
-  layers: [{ id: "osm", type: "raster", source: "osm", paint: { "raster-saturation": -0.15 } }],
-};
 
 const COLOMBIA_CENTER: [number, number] = [-73.5, 4.6];
 
@@ -32,11 +21,12 @@ type Props = {
   route?: [number, number][] | null;
   onSelect: (point: LatLng) => void;
   height?: string;
+  fallbackCenter?: [number, number];
 };
 
 const lineOf = (coords: [number, number][]): GeoJSON.Feature<GeoJSON.LineString> => ({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: coords } });
 
-export default function DestinationMap({ origin, destination, route, onSelect, height = "285px" }: Props) {
+export default function DestinationMap({ origin, destination, route, onSelect, height = "285px", fallbackCenter }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<MLMap | null>(null);
   const ready = useRef(false);
@@ -49,8 +39,8 @@ export default function DestinationMap({ origin, destination, route, onSelect, h
     if (!container.current || map.current) return;
     const start = destination ?? origin;
     const m = new maplibregl.Map({
-      container: container.current, style: STYLE,
-      center: start ? [start.lng, start.lat] : COLOMBIA_CENTER, zoom: start ? 14 : 5,
+      container: container.current, style: mapStyle(false),
+      center: start ? [start.lng, start.lat] : fallbackCenter ?? COLOMBIA_CENTER, zoom: start || fallbackCenter ? 14 : 5,
       attributionControl: { compact: true }, cooperativeGestures: true,
     });
     m.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");

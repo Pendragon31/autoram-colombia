@@ -14,3 +14,9 @@
 
 /*.html
   Cache-Control: public, max-age=0, must-revalidate
+
+/sw.js
+  Cache-Control: public, max-age=0, must-revalidate
+
+/maps/catalog.json
+  Cache-Control: public, max-age=0, must-revalidate

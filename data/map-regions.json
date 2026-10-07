@@ -1,0 +1,6 @@
+[
+  {"id":"llano-v1","name":"Villavicencio y Acacías","description":"Zona urbana y corredor entre las dos ciudades","bounds":[-73.90,3.82,-73.48,4.30],"center":[-73.635,4.105],"maxZoom":15},
+  {"id":"bogota-v1","name":"Bogotá","description":"Zona urbana de Bogotá","bounds":[-74.28,4.48,-73.99,4.86],"center":[-74.09,4.65],"maxZoom":15},
+  {"id":"medellin-v1","name":"Medellín","description":"Medellín y el centro del Valle de Aburrá","bounds":[-75.71,6.10,-75.46,6.38],"center":[-75.575,6.245],"maxZoom":15},
+  {"id":"cali-v1","name":"Cali","description":"Zona urbana de Cali","bounds":[-76.61,3.28,-76.39,3.56],"center":[-76.53,3.44],"maxZoom":15}
+]

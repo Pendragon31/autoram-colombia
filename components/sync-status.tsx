@@ -39,11 +39,11 @@ export default function SyncStatus() {
           boxShadow: s.syncing ? '0 0 0 4px rgba(184,255,44,0.25)' : 'none',
         }}
       />
-      {text}
+      <span>{text}{s.blocked > 0 && <small style={{ display: 'block' }}>{s.blocked} requieren revisión. {s.lastError}</small>}</span>
       {s.online && !s.syncing && (
         <button
           type="button"
-          onClick={() => void outbox.flush()}
+          onClick={() => void outbox.retryBlocked().catch(() => undefined)}
           style={{ marginLeft: 'auto', background: 'none', border: 0, color: '#B8FF2C', fontSize: 13, cursor: 'pointer' }}
         >
           Enviar ahora

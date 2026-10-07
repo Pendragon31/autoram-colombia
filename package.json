@@ -13,7 +13,7 @@
     "test": "npm run build",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "bash scripts/sites-env.sh -- drizzle-kit generate",
-    "test:regression": "node --test tests/trip-regressions.test.cjs tests/offline-regressions.test.cjs"
+    "test:regression": "node --test tests/*regressions.test.cjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

@@ -10,3 +10,5 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
  .form-actions{flex-wrap:wrap;gap:12px}
 }
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+
+.location-share{display:flex;gap:16px;align-items:center;justify-content:space-between;margin:16px 0;padding:18px}.location-share p{margin:6px 0;color:#aab4aa;font-size:13px}.location-share button{flex-shrink:0}@media(max-width:600px){.location-share{align-items:stretch;flex-direction:column}}

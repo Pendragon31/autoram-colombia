@@ -8,7 +8,7 @@ import "./trip-map.css";
 import "./accessibility.css";
 import "./v19.css";
 
-const SITE_URL = "https://autoram-colombia.netlify.app";
+const SITE_URL = "https://autoram-app-colombia.netlify.app";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

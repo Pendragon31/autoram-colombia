@@ -21,6 +21,18 @@ export function getSupabaseBrowserClient() {
   return browserClient;
 }
 
+export async function signInWithGoogle(redirectTo: string) {
+  const { url, key } = publicConfig();
+  const response = await fetch(`${url}/auth/v1/settings`, { headers: { apikey: key }, cache: "no-store" });
+  if (!response.ok) throw new Error("No pudimos comprobar el acceso con Google. Inténtalo de nuevo.");
+  const settings = await response.json() as { external?: { google?: boolean } };
+  if (settings.external?.google !== true) {
+    throw new Error("El acceso con Google aún no está habilitado. Puedes ingresar con correo y contraseña.");
+  }
+  const { error } = await getSupabaseBrowserClient().auth.signInWithOAuth({ provider: "google", options: { redirectTo } });
+  if (error) throw asError(error);
+}
+
 function json(data: unknown, status = 200) { return new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json" } }); }
 function fail(error: unknown): never { throw asError(error); }
 function driverOut(row: Row | null) { return row ? { fullName: row.full_name, document: row.document, phone: row.phone, email: row.email || "", city: row.city, address: row.address || "", license: row.license, category: row.category } : null; }

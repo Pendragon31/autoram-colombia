@@ -3,14 +3,14 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   Activity, AlertTriangle, ArrowDownRight, ArrowUpRight, Bell, CalendarDays,
-  ArrowLeft, BriefcaseBusiness, Camera, CarFront, Check, ChevronRight, CircleDollarSign, Disc3, Droplets, FileCheck2, Fuel,
+  ArrowLeft, BriefcaseBusiness, Camera, CarFront, Check, ChevronRight, CircleDollarSign, Disc3, Droplets, Eye, EyeOff, FileCheck2, Fuel,
   Gauge, Home, LocateFixed, LogOut, Map, MapPin, MoreHorizontal, Navigation, Plus, Route, Search, Send, Settings,
   LockKeyhole, Pause, Phone, Play, ReceiptText, Save, ShieldCheck, Sparkles, Square, TimerReset, TrendingUp, UserRound, WalletCards, Wrench, X,
 } from "lucide-react";
 import dynamic from "next/dynamic";
-import { autoramFetch, getSupabaseBrowserClient } from "@/lib/supabase-browser";
+import { autoramFetch, getSupabaseBrowserClient, signInWithGoogle } from "@/lib/supabase-browser";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { asError } from "@/lib/errors";
+import { asError, authErrorMessage } from "@/lib/errors";
 import { outbox } from "@/lib/offline-queue";
 import { searchAddress } from "@/lib/geocoding";
 import { useTripTracker } from "@/hooks/use-trip-tracker";
@@ -70,13 +70,41 @@ function Brand() {
 
 function LoginFlow({authenticated,accountError=""}:{authenticated:()=>Promise<void>;accountError?:string}) {
   const [mode,setMode]=useState<"login"|"signup">("login"); const [email,setEmail]=useState(""); const [password,setPassword]=useState("");
-  const [busy,setBusy]=useState(false); const [error,setError]=useState(""); const [message,setMessage]=useState("");
-  const submit=async(event:React.FormEvent)=>{event.preventDefault();if(busy)return;setBusy(true);setError("");setMessage("");
+  const [showPassword,setShowPassword]=useState(false);
+  const [busy,setBusy]=useState<"email"|"google"|null>(null); const [error,setError]=useState(""); const [message,setMessage]=useState("");
+  useEffect(()=>{
+    const params=new URLSearchParams(window.location.hash.slice(1));
+    if(!params.has("error"))return;
+    const timer=window.setTimeout(()=>setError("El ingreso no se completó. Inténtalo de nuevo o ingresa con tu correo y contraseña."),0);
+    return()=>window.clearTimeout(timer);
+  },[]);
+  const submit=async(event:React.FormEvent)=>{event.preventDefault();if(busy)return;setBusy("email");setError("");setMessage("");
     try{const supabase=getSupabaseBrowserClient();
       if(mode==="login"){const {error:authError}=await supabase.auth.signInWithPassword({email:email.trim(),password});if(authError)throw authError;await authenticated()}
       else{const {data,error:authError}=await supabase.auth.signUp({email:email.trim(),password,options:{emailRedirectTo:window.location.origin}});if(authError)throw authError;if(data.session)await authenticated();else setMessage("Revisa tu correo y confirma la cuenta para entrar a Autoram.")}
-    }catch(reason){setError(reason instanceof Error?reason.message:"No pudimos completar el ingreso.")}finally{setBusy(false)}};
-  return <main className="login-page"><section className="login-brand-panel"><div className="login-logo"><Brand/></div><div className="login-message"><span>AUTORAM COLOMBIA</span><h1>Tu vehículo.<br/><em>Tus números.</em><br/>Tu camino.</h1><p>Combustible, recorridos, mantenimiento y rentabilidad en una experiencia diseñada para conductores colombianos.</p></div><div className="login-proof"><div><ShieldCheck size={18}/><span><b>Información protegida</b><small>Cada conductor ve únicamente sus datos</small></span></div><div><Disc3 size={18}/><span><b>Parque automotor</b><small>Varios vehículos en una sola cuenta</small></span></div></div></section><section className="login-form-panel"><div className="login-mobile-brand"><Brand/></div><div className="login-box"><div className="code-icon"><ShieldCheck size={26}/></div><small className="login-over">{mode==="login"?"ACCESO SEGURO":"NUEVA CUENTA"}</small><h2>{mode==="login"?"Bienvenido a Autoram":"Crea tu cuenta"}</h2><p>{mode==="login"?"Ingresa con el correo y la contraseña que registraste.":"Tu información quedará sincronizada y protegida en todos tus dispositivos."}</p>{(error||accountError)&&<div className="form-error"><AlertTriangle size={16}/>{error||accountError}</div>}{message&&<div className="auth-success"><Check size={16}/>{message}</div>}<form className="auth-form" onSubmit={submit}><label><span>Correo electrónico</span><input type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="nombre@correo.com" required/></label><label><span>Contraseña</span><input type="password" autoComplete={mode==="login"?"current-password":"new-password"} minLength={8} value={password} onChange={e=>setPassword(e.target.value)} placeholder="Mínimo 8 caracteres" required/></label><button className="login-main" type="submit" disabled={busy}>{busy?"Conectando…":mode==="login"?"Ingresar":"Crear cuenta"}<ChevronRight size={18}/></button></form><button className="auth-toggle" type="button" onClick={()=>{setMode(mode==="login"?"signup":"login");setError("");setMessage("")}}>{mode==="login"?"¿Primera vez? Crear una cuenta":"Ya tengo cuenta · Ingresar"}</button><div className="security-note"><LockKeyhole size={17}/><span>Autenticación y registros protegidos por Supabase.</span></div><p className="terms">Al continuar aceptas los términos de uso y la política de privacidad de Autoram.</p></div></section></main>
+    }catch(reason){setError(authErrorMessage(reason))}finally{setBusy(null)}};
+  const google=async()=>{
+    if(busy)return;setBusy("google");setError("");setMessage("");
+    try{await signInWithGoogle(window.location.origin)}
+    catch(reason){setError(authErrorMessage(reason))}
+    finally{setBusy(null)}
+  };
+  return <main className="login-page">
+    <section className="login-brand-panel"><div className="login-logo"><Brand/></div><div className="login-message"><span>AUTORAM COLOMBIA</span><h1>Tu vehículo.<br/><em>Tus números.</em><br/>Tu camino.</h1><p>Combustible, recorridos, mantenimiento y rentabilidad en una experiencia diseñada para conductores colombianos.</p></div><div className="login-proof"><div><ShieldCheck size={18}/><span><b>Información protegida</b><small>Cada conductor ve únicamente sus datos</small></span></div><div><Disc3 size={18}/><span><b>Parque automotor</b><small>Varios vehículos en una sola cuenta</small></span></div></div></section>
+    <section className="login-form-panel"><div className="login-mobile-brand"><Brand/></div><div className="login-box">
+      <div className="code-icon"><ShieldCheck size={26}/></div><small className="login-over">{mode==="login"?"ACCESO SEGURO":"NUEVA CUENTA"}</small><h2>{mode==="login"?"Bienvenido a Autoram":"Crea tu cuenta"}</h2><p>{mode==="login"?"Ingresa con el correo y la contraseña que registraste.":"Tu información quedará sincronizada y protegida en todos tus dispositivos."}</p>
+      {(error||accountError)&&<div className="form-error" role="alert"><AlertTriangle size={16}/>{error||accountError}</div>}{message&&<div className="auth-success" role="status"><Check size={16}/>{message}</div>}
+      <form className="auth-form" onSubmit={submit}>
+        <label><span>Correo electrónico</span><input type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="nombre@correo.com" required/></label>
+        <label htmlFor="auth-password"><span>Contraseña</span><div className="password-field"><input id="auth-password" type={showPassword?"text":"password"} autoComplete={mode==="login"?"current-password":"new-password"} minLength={8} value={password} onChange={e=>setPassword(e.target.value)} placeholder="Mínimo 8 caracteres" required/><button className="password-toggle" type="button" aria-label={showPassword?"Ocultar contraseña":"Ver contraseña"} aria-pressed={showPassword} aria-controls="auth-password" onClick={()=>setShowPassword(value=>!value)}>{showPassword?<EyeOff size={20}/>:<Eye size={20}/>}</button></div></label>
+        <button className="login-main" type="submit" disabled={Boolean(busy)}>{busy==="email"?"Conectando…":mode==="login"?"Ingresar":"Crear cuenta"}<ChevronRight size={18}/></button>
+      </form>
+      <div className="login-divider"><span/>o continúa con<span/></div>
+      <button className="google-login" type="button" disabled={Boolean(busy)} onClick={google}><b aria-hidden="true">G</b>{busy==="google"?"Conectando con Google…":"Continuar con Google"}</button>
+      <button className="auth-toggle" type="button" disabled={Boolean(busy)} onClick={()=>{setMode(mode==="login"?"signup":"login");setShowPassword(false);setError("");setMessage("")}}>{mode==="login"?"¿Primera vez? Crear una cuenta":"Ya tengo cuenta · Ingresar"}</button>
+      <div className="security-note"><LockKeyhole size={17}/><span>Autenticación y registros protegidos por Supabase.</span></div><p className="terms">Al continuar aceptas los términos de uso y la política de privacidad de Autoram.</p>
+    </div></section>
+  </main>
 }
 
 function DriverOnboarding({complete,initial,cancel}:{complete:(driver:DriverProfile)=>Promise<void>;initial?:DriverProfile;cancel?:()=>void}) {

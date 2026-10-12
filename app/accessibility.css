@@ -21,3 +21,8 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .login-divider{font-size:12px}
 .google-login{font-size:13px;min-height:48px}
 .google-login:disabled{opacity:.55;cursor:wait}
+.auth-forgot{display:block;margin:8px 0 0 auto;min-height:44px;padding:8px 0;border:0;background:transparent;color:var(--lime);font-size:13px;cursor:pointer}
+.auth-forgot:disabled{opacity:.55;cursor:wait}
+.auth-back{display:inline-flex;align-items:center;min-height:44px;margin-top:14px;padding:0;border:0;background:transparent;color:var(--lime);font-size:13px;cursor:pointer}
+.recovery-action{width:100%;min-height:49px;display:flex;align-items:center;justify-content:center;gap:12px;margin-top:20px;border:0;border-radius:12px;background:var(--lime);color:#090c0a;font-size:13px;font-weight:800;cursor:pointer}
+.recovery-page .login-box>p,.login-box .auth-success{font-size:13px;line-height:1.65}

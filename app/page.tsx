@@ -19,6 +19,8 @@ import { useVehicleRealtime } from "@/hooks/use-vehicle-realtime";
 import SyncStatus from "@/components/sync-status";
 import type { TrackPoint } from "@/lib/geo";
 import type { LatLng } from "@/components/destination-map";
+import PasswordRecovery from "@/components/password-recovery";
+import { isPasswordRecoveryURL, requestPasswordRecovery } from "@/lib/password-recovery";
 
 // Los mapas usan WebGL y el DOM: se cargan solo en el navegador.
 const NavigationPanel = dynamic(() => import("@/components/navigation-panel"), { ssr: false });
@@ -69,19 +71,28 @@ function Brand() {
   </div>
 }
 
-function LoginFlow({authenticated,accountError=""}:{authenticated:()=>Promise<void>;accountError?:string}) {
-  const [mode,setMode]=useState<"login"|"signup">("login"); const [email,setEmail]=useState(""); const [password,setPassword]=useState("");
+function LoginFlow({authenticated,accountError="",initialMode="login"}:{authenticated:()=>Promise<void>;accountError?:string;initialMode?:"login"|"forgot"}) {
+  const [mode,setMode]=useState<"login"|"signup"|"forgot">(initialMode); const [email,setEmail]=useState(""); const [password,setPassword]=useState("");
   const [showPassword,setShowPassword]=useState(false);
   const [busy,setBusy]=useState<"email"|"google"|null>(null); const [error,setError]=useState(""); const [message,setMessage]=useState("");
+  const [retryAt,setRetryAt]=useState(0); const [remaining,setRemaining]=useState(0);
+  useEffect(()=>{
+    if(!retryAt)return;
+    const update=()=>{const seconds=Math.max(0,Math.ceil((retryAt-Date.now())/1000));setRemaining(seconds);if(!seconds)setRetryAt(0)};
+    const interval=window.setInterval(update,1000); const timer=window.setTimeout(update,0);
+    return()=>{window.clearInterval(interval);window.clearTimeout(timer)};
+  },[retryAt]);
+  const changeMode=(next:"login"|"signup"|"forgot")=>{setMode(next);setPassword("");setShowPassword(false);setError("");setMessage("")};
   useEffect(()=>{
     const params=new URLSearchParams(window.location.hash.slice(1));
     if(!params.has("error"))return;
     const timer=window.setTimeout(()=>setError("El ingreso no se completó. Inténtalo de nuevo o ingresa con tu correo y contraseña."),0);
     return()=>window.clearTimeout(timer);
   },[]);
-  const submit=async(event:React.FormEvent)=>{event.preventDefault();if(busy)return;setBusy("email");setError("");setMessage("");
+  const submit=async(event:React.FormEvent)=>{event.preventDefault();if(busy||(mode==="forgot"&&Date.now()<retryAt))return;setBusy("email");setError("");setMessage("");
     try{const supabase=getSupabaseBrowserClient();
-      if(mode==="login"){const {error:authError}=await supabase.auth.signInWithPassword({email:email.trim(),password});if(authError)throw authError;await authenticated()}
+      if(mode==="forgot"){setMessage(await requestPasswordRecovery(supabase.auth,email,window.location.origin));setRetryAt(Date.now()+60_000);setRemaining(60)}
+      else if(mode==="login"){const {error:authError}=await supabase.auth.signInWithPassword({email:email.trim(),password});if(authError)throw authError;await authenticated()}
       else{const {data,error:authError}=await supabase.auth.signUp({email:email.trim(),password,options:{emailRedirectTo:window.location.origin}});if(authError)throw authError;if(data.session)await authenticated();else setMessage("Revisa tu correo y confirma la cuenta para entrar a Autoram.")}
     }catch(reason){setError(authErrorMessage(reason))}finally{setBusy(null)}};
   const google=async()=>{
@@ -93,17 +104,17 @@ function LoginFlow({authenticated,accountError=""}:{authenticated:()=>Promise<vo
   return <main className="login-page">
     <section className="login-brand-panel"><div className="login-logo"><Brand/></div><div className="login-message"><span>AUTORAM COLOMBIA</span><h1>Tu vehículo.<br/><em>Tus números.</em><br/>Tu camino.</h1><p>Combustible, recorridos, mantenimiento y rentabilidad en una experiencia diseñada para conductores colombianos.</p></div><div className="login-proof"><div><ShieldCheck size={18}/><span><b>Información protegida</b><small>Cada conductor ve únicamente sus datos</small></span></div><div><Disc3 size={18}/><span><b>Parque automotor</b><small>Varios vehículos en una sola cuenta</small></span></div></div></section>
     <section className="login-form-panel"><div className="login-mobile-brand"><Brand/></div><div className="login-box">
-      <div className="code-icon"><ShieldCheck size={26}/></div><small className="login-over">{mode==="login"?"ACCESO SEGURO":"NUEVA CUENTA"}</small><h2>{mode==="login"?"Bienvenido a Autoram":"Crea tu cuenta"}</h2><p>{mode==="login"?"Ingresa con el correo y la contraseña que registraste.":"Tu información quedará sincronizada y protegida en todos tus dispositivos."}</p>
-      {(error||accountError)&&<div className="form-error" role="alert"><AlertTriangle size={16}/>{error||accountError}</div>}{message&&<div className="auth-success" role="status"><Check size={16}/>{message}</div>}
+      <div className="code-icon"><ShieldCheck size={26}/></div><small className="login-over">{mode==="login"?"ACCESO SEGURO":mode==="forgot"?"RECUPERAR ACCESO":"NUEVA CUENTA"}</small><h2>{mode==="login"?"Bienvenido a Autoram":mode==="forgot"?"Recupera tu contraseña":"Crea tu cuenta"}</h2><p>{mode==="login"?"Ingresa con el correo y la contraseña que registraste.":mode==="forgot"?"Escribe el correo de tu cuenta. Te enviaremos un enlace para elegir una nueva contraseña.":"Tu información quedará sincronizada y protegida en todos tus dispositivos."}</p>
+      {(error||(mode!=="forgot"&&accountError))&&<div className="form-error" role="alert"><AlertTriangle size={16}/>{error||accountError}</div>}{message&&<div className="auth-success" role="status"><Check size={16}/>{message}</div>}
       <form className="auth-form" onSubmit={submit}>
         <label><span>Correo electrónico</span><input type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="nombre@correo.com" required/></label>
-        <div className="auth-password-control"><label htmlFor="auth-password"><span>Contraseña</span></label><div className="password-field"><input id="auth-password" type={showPassword?"text":"password"} autoComplete={mode==="login"?"current-password":"new-password"} minLength={8} value={password} onChange={e=>setPassword(e.target.value)} placeholder="Mínimo 8 caracteres" required/><button className="password-toggle" type="button" aria-label={showPassword?"Ocultar contraseña":"Ver contraseña"} aria-pressed={showPassword} aria-controls="auth-password" onClick={()=>setShowPassword(value=>!value)}>{showPassword?<EyeOff size={20}/>:<Eye size={20}/>}</button></div></div>
-        <button className="login-main" type="submit" disabled={Boolean(busy)}>{busy==="email"?"Conectando…":mode==="login"?"Ingresar":"Crear cuenta"}<ChevronRight size={18}/></button>
+        {mode!=="forgot"&&<div className="auth-password-control"><label htmlFor="auth-password"><span>Contraseña</span></label><div className="password-field"><input id="auth-password" type={showPassword?"text":"password"} autoComplete={mode==="login"?"current-password":"new-password"} minLength={mode==="signup"?8:undefined} value={password} onChange={e=>setPassword(e.target.value)} placeholder={mode==="signup"?"Mínimo 8 caracteres":"Tu contraseña"} required/><button className="password-toggle" type="button" aria-label={showPassword?"Ocultar contraseña":"Ver contraseña"} aria-pressed={showPassword} aria-controls="auth-password" onClick={()=>setShowPassword(value=>!value)}>{showPassword?<EyeOff size={20}/>:<Eye size={20}/>}</button></div></div>}
+        <button className="login-main" type="submit" disabled={Boolean(busy)||(mode==="forgot"&&remaining>0)}>{busy==="email"?(mode==="forgot"?"Enviando…":"Conectando…"):mode==="login"?"Ingresar":mode==="forgot"?(remaining>0?`Reenviar en ${remaining}s`:"Enviar enlace de recuperación"):"Crear cuenta"}<ChevronRight size={18}/></button>
       </form>
-      <div className="login-divider"><span/>o continúa con<span/></div>
-      <button className="google-login" type="button" disabled={Boolean(busy)} onClick={google}><b aria-hidden="true">G</b>{busy==="google"?"Conectando con Google…":"Continuar con Google"}</button>
+      {mode==="login"&&<button className="auth-forgot" type="button" disabled={Boolean(busy)} onClick={()=>changeMode("forgot")}>Olvidé mi contraseña</button>}
+      {mode!=="forgot"&&<><div className="login-divider"><span/>o continúa con<span/></div><button className="google-login" type="button" disabled={Boolean(busy)} onClick={google}><b aria-hidden="true">G</b>{busy==="google"?"Conectando con Google…":"Continuar con Google"}</button></>}
       <a className="auth-offline-link" href="/mapas">Mapas y navegación sin internet</a>
-      <button className="auth-toggle" type="button" disabled={Boolean(busy)} onClick={()=>{setMode(mode==="login"?"signup":"login");setShowPassword(false);setError("");setMessage("")}}>{mode==="login"?"¿Primera vez? Crear una cuenta":"Ya tengo cuenta · Ingresar"}</button>
+      <button className="auth-toggle" type="button" disabled={Boolean(busy)} onClick={()=>changeMode(mode==="login"?"signup":"login")}>{mode==="login"?"¿Primera vez? Crear una cuenta":mode==="forgot"?"Volver a ingresar":"Ya tengo cuenta · Ingresar"}</button>
       <div className="security-note"><LockKeyhole size={17}/><span>Autenticación y registros protegidos por Supabase.</span></div><p className="terms">Al continuar aceptas los términos de uso y la política de privacidad de Autoram.</p>
     </div></section>
   </main>
@@ -189,6 +200,22 @@ function SmartVehicleOnboarding({complete,cancel}:{complete:(vehicle:VehicleProf
 }
 
 export default function App() {
+  const [screen,setScreen]=useState<"loading"|"app"|"recovery"|"forgot">("loading");
+  useEffect(()=>{
+    const timer=window.setTimeout(()=>{
+      const url=new URL(window.location.href);
+      setScreen(isPasswordRecoveryURL(url.href)?"recovery":url.searchParams.get("auth")==="forgot"?"forgot":"app");
+    },0);
+    return()=>window.clearTimeout(timer);
+  },[]);
+  // Elegir la pantalla antes de inicializar Supabase evita abrir la cuenta al seguir un enlace de recuperación.
+  if(screen==="recovery")return <PasswordRecovery brand={<Brand/>}/>;
+  if(screen==="forgot")return <LoginFlow initialMode="forgot" authenticated={async()=>{window.location.replace("/")}}/>;
+  if(screen==="loading")return <main className="app-loading"><Brand/><span><i/></span><h1>Preparando AutoRAM</h1></main>;
+  return <AutoRAMApp/>;
+}
+
+function AutoRAMApp() {
   const [stage, setStage] = useState<"loading"|"login"|"driver"|"onboarding"|"app"|"connection-error">("loading");
   const [client,setClient]=useState<SupabaseClient|null>(null);
   const [userId,setUserId]=useState<string|null>(null);

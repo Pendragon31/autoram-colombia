@@ -21,6 +21,14 @@ export function getSupabaseBrowserClient() {
   return browserClient;
 }
 
+export function createSupabaseRecoveryClient() {
+  const { url, key } = publicConfig();
+  return createClient(url, key, { auth: {
+    persistSession: false, autoRefreshToken: false, detectSessionInUrl: false,
+    storageKey: `autoram.recovery.${crypto.randomUUID()}`,
+  } });
+}
+
 export async function signInWithGoogle(redirectTo: string) {
   const { url, key } = publicConfig();
   const response = await fetch(`${url}/auth/v1/settings`, { headers: { apikey: key }, cache: "no-store" });

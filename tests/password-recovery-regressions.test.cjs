@@ -7,17 +7,22 @@ const recovery = evaluate('lib/password-recovery.ts', () => errors, { URLSearchP
 const origin = 'https://autoram-app-colombia.netlify.app';
 const link = `${origin}/?auth=recovery#type=recovery&access_token=valid-recovery-fixture`;
 
-function setup({ sessionError, userError, updateError, sendError, verifiedId = 'driver-a', session = undefined } = {}) {
+function setup({ sessionError, userError, updateError, sendError, verifiedId = 'driver-a', session = undefined, boundId = 'driver-a', bindingError = null, switchDuringVerification = false } = {}) {
   const values = new Map();
   const storage = { getItem: key => values.get(key) || null, setItem: (key, value) => values.set(key, value), removeItem: key => values.delete(key) };
   const calls = [];
+  let activeUser = 'driver-a';
   const auth = {
-    getSession: async () => ({ data: { session: session === undefined ? { user: { id: 'driver-a' }, access_token: 'valid-recovery-fixture' } : session }, error: sessionError || null }),
-    getUser: async () => { calls.push({ action: 'verify' }); return { data: { user: verifiedId ? { id: verifiedId } : null }, error: userError || null }; },
+    getSession: async () => ({ data: { session: session === undefined ? { user: { id: activeUser }, access_token: 'valid-recovery-fixture', refresh_token: 'refresh-fixture' } : session }, error: sessionError || null }),
+    getUser: async () => { calls.push({ action: 'verify' }); if (switchDuringVerification) activeUser = 'driver-b'; return { data: { user: verifiedId ? { id: verifiedId } : null }, error: userError || null }; },
     resetPasswordForEmail: async (email, options) => { calls.push({ action: 'request', email, options: JSON.parse(JSON.stringify(options)) }); return { data: {}, error: sendError || null }; },
-    updateUser: async options => { calls.push({ action: 'update', options: JSON.parse(JSON.stringify(options)) }); return { data: {}, error: updateError || null }; },
+    updateUser: async () => { calls.push({ action: 'unsafe-global-update', userId: activeUser }); return { data: {}, error: null }; },
   };
-  return { auth, storage, values, calls };
+  const createRecoveryAuth = () => ({
+    setSession: async tokens => { calls.push({ action: 'bind', tokens: JSON.parse(JSON.stringify(tokens)) }); return { data: { user: { id: boundId } }, error: bindingError }; },
+    updateUser: async options => { calls.push({ action: 'update', userId: boundId, options: JSON.parse(JSON.stringify(options)) }); return { data: {}, error: updateError || null }; },
+  });
+  return { auth, storage, values, calls, createRecoveryAuth };
 }
 
 test('recovery emails return to the same deployed app and do not reveal account existence', async () => {
@@ -88,31 +93,67 @@ test('recovery context expires and is isolated between users in the same browser
 
 test('short and mismatched passwords never reach Supabase', async () => {
   const env = setup();
-  await assert.rejects(recovery.updateRecoveredPassword(env.auth, 'driver-a', 'short', 'short'), /8 caracteres/);
-  await assert.rejects(recovery.updateRecoveredPassword(env.auth, 'driver-a', '        ', '        '), /8 caracteres/);
-  await assert.rejects(recovery.updateRecoveredPassword(env.auth, 'driver-a', 'long-fixture-a', 'long-fixture-b'), /no coinciden/);
+  await assert.rejects(recovery.updateRecoveredPassword(env.auth, 'driver-a', 'short', 'short', env.createRecoveryAuth), /8 caracteres/);
+  await assert.rejects(recovery.updateRecoveredPassword(env.auth, 'driver-a', '        ', '        ', env.createRecoveryAuth), /8 caracteres/);
+  await assert.rejects(recovery.updateRecoveredPassword(env.auth, 'driver-a', 'long-fixture-a', 'long-fixture-b', env.createRecoveryAuth), /no coinciden/);
   assert.equal(env.calls.length, 0);
 });
 
 test('changing accounts or losing a session blocks the password update', async () => {
   for (const options of [{ verifiedId: 'driver-b' }, { verifiedId: null }, { userError: { message: 'Session missing', code: 'session_not_found' } }]) {
     const env = setup(options);
-    await assert.rejects(recovery.updateRecoveredPassword(env.auth, 'driver-a', 'valid-fixture', 'valid-fixture'));
+    await assert.rejects(recovery.updateRecoveredPassword(env.auth, 'driver-a', 'valid-fixture', 'valid-fixture', env.createRecoveryAuth));
     assert.equal(env.calls.filter(call => call.action === 'update').length, 0);
   }
 });
 
 test('a confirmed password is updated only for the verified recovery user', async () => {
   const env = setup();
-  await recovery.updateRecoveredPassword(env.auth, 'driver-a', 'valid-fixture', 'valid-fixture');
-  assert.deepEqual(env.calls, [{ action: 'verify' }, { action: 'update', options: { password: 'valid-fixture' } }]);
+  await recovery.updateRecoveredPassword(env.auth, 'driver-a', 'valid-fixture', 'valid-fixture', env.createRecoveryAuth);
+  assert.deepEqual(env.calls, [{ action: 'verify' }, { action: 'bind', tokens: { access_token: 'valid-recovery-fixture', refresh_token: 'refresh-fixture' } }, { action: 'update', userId: 'driver-a', options: { password: 'valid-fixture' } }]);
   recovery.clearPasswordRecovery(env.storage);
   assert.equal(env.values.size, 0);
 });
 
 test('failed password updates preserve the error and are never reported as saved', async () => {
   const env = setup({ updateError: { message: 'New password should be different', code: 'same_password' } });
-  await assert.rejects(recovery.updateRecoveredPassword(env.auth, 'driver-a', 'valid-fixture', 'valid-fixture'), error => error.code === 'same_password');
+  await assert.rejects(recovery.updateRecoveredPassword(env.auth, 'driver-a', 'valid-fixture', 'valid-fixture', env.createRecoveryAuth), error => error.code === 'same_password');
+});
+
+test('a session switch during verification cannot update or sign out a different user', async () => {
+  const env = setup({ switchDuringVerification: true });
+  await recovery.updateRecoveredPassword(env.auth, 'driver-a', 'valid-fixture', 'valid-fixture', env.createRecoveryAuth);
+  const active = await env.auth.getSession();
+  assert.equal(active.data.session.user.id, 'driver-b');
+  assert.deepEqual(env.calls.filter(call => call.action === 'update'), [{ action: 'update', userId: 'driver-a', options: { password: 'valid-fixture' } }]);
+  assert.equal(env.calls.filter(call => call.action === 'unsafe-global-update').length, 0);
+});
+
+test('an invalid or different bound recovery session cannot update a password', async () => {
+  for (const options of [{ boundId: 'driver-b' }, { bindingError: { message: 'expired', code: 'bad_jwt' } }]) {
+    const env = setup(options);
+    await assert.rejects(recovery.updateRecoveredPassword(env.auth, 'driver-a', 'valid-fixture', 'valid-fixture', env.createRecoveryAuth));
+    assert.equal(env.calls.filter(call => call.action === 'update' || call.action === 'unsafe-global-update').length, 0);
+  }
+});
+
+test('the isolated password client never persists tokens or changes the app session', () => {
+  const clients = [];
+  const browser = evaluate('lib/supabase-browser.ts', id => {
+    if (id.includes('supabase-js')) return { createClient: (url, key, options) => { const client = { auth: {}, options }; clients.push(client); return client; } };
+    return id.includes('errors') ? errors : {};
+  }, {
+    process: { env: { NEXT_PUBLIC_SUPABASE_URL: 'https://example.supabase.co', NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_fixture' } },
+    crypto: { randomUUID: () => 'fixture-id' },
+  });
+  const regular = browser.getSupabaseBrowserClient();
+  const isolated = browser.createSupabaseRecoveryClient();
+  assert.equal(browser.getSupabaseBrowserClient(), regular);
+  assert.notEqual(isolated, regular);
+  assert.equal(isolated.options.auth.persistSession, false);
+  assert.equal(isolated.options.auth.autoRefreshToken, false);
+  assert.equal(isolated.options.auth.detectSessionInUrl, false);
+  assert.notEqual(isolated.options.auth.storageKey, regular.options.auth.storageKey);
 });
 
 test('recovery errors explain expiry, throttling and password requirements in Spanish', () => {

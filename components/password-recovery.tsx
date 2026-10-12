@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { AlertTriangle, Check, ChevronRight, Eye, EyeOff, LockKeyhole, ShieldCheck } from "lucide-react";
-import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
+import { createSupabaseRecoveryClient, getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { authErrorMessage } from "@/lib/errors";
 import { clearPasswordRecovery, resolvePasswordRecovery, updateRecoveredPassword } from "@/lib/password-recovery";
 
@@ -47,12 +47,10 @@ export default function PasswordRecovery({ brand }: { brand: ReactNode }) {
     setBusy(true); setError("");
     try {
       const auth = getSupabaseBrowserClient().auth;
-      await updateRecoveredPassword(auth, userId, password, confirmation);
+      await updateRecoveredPassword(auth, userId, password, confirmation, () => createSupabaseRecoveryClient().auth);
       clearPasswordRecovery(tabStorage);
       setPassword(""); setConfirmation(""); setShowPassword(false); setShowConfirmation(false);
       setPhase("done");
-      // El cambio ya está confirmado, incluso si falla el cierre de esta sesión.
-      await auth.signOut({ scope: "local" }).catch(() => undefined);
     } catch (reason) { setError(authErrorMessage(reason)); }
     finally { setBusy(false); }
   };

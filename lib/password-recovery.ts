@@ -61,12 +61,23 @@ export async function requestPasswordRecovery(auth: Auth, email: string, origin:
   return RECOVERY_SENT;
 }
 
-export async function updateRecoveredPassword(auth: Auth, userId: string, password: string, confirmation: string) {
+export async function updateRecoveredPassword(auth: Auth, userId: string, password: string, confirmation: string, createRecoveryAuth: () => Auth) {
   if (password.length < 8 || !password.trim()) throw new Error("La nueva contraseña debe tener al menos 8 caracteres.");
   if (password !== confirmation) throw new Error("Las contraseñas no coinciden. Vuelve a escribirlas.");
-  const verified = await auth.getUser();
+  const current = await auth.getSession();
+  if (current.error) throw asError(current.error);
+  const session = current.data.session;
+  if (!userId || session?.user.id !== userId || !session.access_token || !session.refresh_token) throw new Error(RECOVERY_EXPIRED);
+  const tokens = { access_token: session.access_token, refresh_token: session.refresh_token };
+  const verified = await auth.getUser(tokens.access_token);
   if (verified.error) throw asError(verified.error);
-  if (!userId || verified.data.user?.id !== userId) throw new Error(RECOVERY_EXPIRED);
-  const { error } = await auth.updateUser({ password });
+  if (verified.data.user?.id !== userId) throw new Error(RECOVERY_EXPIRED);
+  // La sesión puede cambiar en otra pestaña mientras llega la verificación.
+  // Fijar la operación a esta copia evita cambiar la contraseña de otra cuenta.
+  const recoveryAuth = createRecoveryAuth();
+  const bound = await recoveryAuth.setSession(tokens);
+  if (bound.error) throw asError(bound.error);
+  if (bound.data.user?.id !== userId) throw new Error(RECOVERY_EXPIRED);
+  const { error } = await recoveryAuth.updateUser({ password });
   if (error) throw asError(error);
 }

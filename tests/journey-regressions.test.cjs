@@ -74,3 +74,12 @@ test('a server row cap smaller than the requested page never truncates the perio
   const records = await fetchJourneyRecords(fakeClient({ rows: 123, cap: 50 }), 27, 'today', now, new AbortController().signal);
   assert.equal(records.sessions.length, 123); assert.equal(records.trips.length, 123);
 });
+
+test('the weekly chart reconciles with the seven day balance and assigns overnight income to closing day', () => {
+  const records = empty(); records.sessions = [{ id: 1, endedAt: '2026-10-21T05:00:00Z', income: 100, expenses: 20 }, { id: 2, endedAt: '2026-10-20T04:59:00Z', income: 50, expenses: 5 }];
+  records.fuelRecords = [{ id: 1, occurredAt: '2026-10-21T07:00:00Z', total: 30 }];
+  const week = summary.journeyWeek(records, now), totals = summarizeJourney(records, 'week', now);
+  assert.equal(week.reduce((sum, day) => sum + day.income, 0), totals.income);
+  assert.equal(week.reduce((sum, day) => sum + day.expenses, 0), totals.expenses);
+  assert.equal(week[6].income, 100); assert.equal(week[6].expenses, 50);
+});

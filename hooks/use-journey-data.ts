@@ -9,21 +9,21 @@ export function useJourneyData(vehicleId: number | undefined, records: JourneyRe
   const online = useOnline();
   const [attempt, setAttempt] = useState(0);
   const renderNow = now;
-  const start = journeyBounds(period, new Date(renderNow)).start;
-  const key = `${vehicleId}:${period}:${start}:${attempt}`;
+  const start = journeyBounds('month', new Date(renderNow)).start;
+  const key = `${vehicleId}:${start}:${attempt}`;
   const [result, setResult] = useState<{ key: string; records: JourneyRecords | null; failed: boolean } | null>(null);
   useEffect(() => {
     if (!vehicleId || vehicleId < 0 || !online) return;
     const controller = new AbortController(); let alive = true;
     const timeout = setTimeout(() => { controller.abort(); if (alive) setResult({ key, records: null, failed: true }); }, 15000);
-    void fetchJourneyRecords(getSupabaseBrowserClient(), vehicleId, period, new Date(), controller.signal)
+    void fetchJourneyRecords(getSupabaseBrowserClient(), vehicleId, 'month', new Date(), controller.signal)
       .then(data => { if (alive && !controller.signal.aborted) setResult({ key, records: data, failed: false }); })
       .catch(() => { if (alive && !controller.signal.aborted) { controller.abort(); setResult({ key, records: null, failed: true }); } })
       .finally(() => clearTimeout(timeout));
     return () => { alive = false; controller.abort(); clearTimeout(timeout); };
-  }, [vehicleId, period, start, online, key]);
+  }, [vehicleId, start, online, key]);
   const current = result?.key === key ? result : null;
   const status: 'ready'|'loading'|'error'|'offline' = !online || (vehicleId !== undefined && vehicleId <= 0) ? 'offline' : current?.failed ? 'error' : current?.records || !vehicleId ? 'ready' : 'loading';
   const all = current?.records ? mergeJourneyRecords(current.records, records) : records;
-  return { totals: summarizeJourney(all, period, new Date(renderNow)), status, retry: () => setAttempt(value => value + 1) };
+  return { records: all, totals: summarizeJourney(all, period, new Date(renderNow)), status, retry: () => setAttempt(value => value + 1) };
 }

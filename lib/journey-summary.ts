@@ -43,3 +43,12 @@ export function summarizeJourney(records: JourneyRecords, period: JourneyPeriod,
     closedCount: closed.length, fuelCount: fuel.length, maintenanceCount: maintenance.length,
     hasRecords: !!(closed.length || fuel.length || maintenance.length || trips.length) };
 }
+
+export function journeyWeek(records: JourneyRecords, now: Date) {
+  const start = journeyBounds('week', now).start;
+  return Array.from({ length: 7 }, (_, index) => {
+    const end = new Date(Math.min(start + (index + 1) * 86400000 - 1, now.getTime()));
+    const totals = summarizeJourney(records, 'today', end);
+    return { label: end.toLocaleDateString('es-CO', { timeZone: 'America/Bogota', weekday: 'short' }), income: totals.income, expenses: totals.expenses };
+  });
+}

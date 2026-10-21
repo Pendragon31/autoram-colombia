@@ -8,7 +8,7 @@ import { useOnline } from '@/hooks/use-online';
 export function useJourneyData(vehicleId: number | undefined, records: JourneyRecords, period: JourneyPeriod, now: number) {
   const online = useOnline();
   const [attempt, setAttempt] = useState(0);
-  const renderNow = Math.max(now, Date.now());
+  const renderNow = now;
   const start = journeyBounds(period, new Date(renderNow)).start;
   const key = `${vehicleId}:${period}:${start}:${attempt}`;
   const [result, setResult] = useState<{ key: string; records: JourneyRecords | null; failed: boolean } | null>(null);

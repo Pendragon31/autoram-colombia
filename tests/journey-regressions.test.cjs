@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- Node regression tests use CommonJS. */
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { evaluate } = require('./helpers.cjs');

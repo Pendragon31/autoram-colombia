@@ -208,3 +208,11 @@
 
 @media(max-width:760px) { .shell .main>header { height:auto; min-height:86px; flex-wrap:wrap; row-gap:12px; } .shell .header-actions { flex-wrap:wrap; max-width:100%; } }
 @media(max-width:400px) { .shell .header-actions .primary { font-size:0; width:44px; height:44px; padding:0; } .shell .header-actions .primary svg { width:20px; height:20px; } }
+
+.journey-vehicle__photo { margin:8px 0; min-width:0; }
+.journey-vehicle__photo img { display:block; width:100%; height:185px; object-fit:contain; border-radius:15px; }
+.journey-vehicle__photo figcaption { font-size:9px; line-height:1.5; color:var(--ux-muted); text-align:center; padding-top:5px; overflow-wrap:anywhere; }
+.shell[data-appearance="day"]>aside nav button { color:var(--ux-muted); }
+.shell[data-appearance="day"] :is(aside nav button.active,.mobile-nav button.active) { background:#e4efca; color:#294204; }
+.shell[data-appearance="day"] :is(.work-map-credit,.work-map-credit a,.maps-footnote) { color:var(--ux-muted); }
+@media(max-width:760px) { .journey-vehicle__photo { width:105px; margin:0; } .journey-vehicle__photo img { height:70px; width:105px; } .journey-vehicle__photo figcaption { font-size:8px; } }

@@ -323,6 +323,7 @@ function Dashboard({onRegister,go,workActive,setWorkActive,workConfig,setWorkCon
   const [period,setPeriod]=useState<JourneyPeriod>('today');
   const [now,setNow]=useState(Date.now);
   useEffect(()=>{const timer=setInterval(()=>setNow(Date.now()),60_000);return()=>clearInterval(timer)},[]);
+  useEffect(()=>{const timer=setTimeout(()=>setNow(Date.now()),0);return()=>clearTimeout(timer)},[sessions,fuelRecords,maintenanceRecords,trips]);
   const {totals,status,retry}=useJourneyData(vehicle?.id,{sessions,fuelRecords,maintenanceRecords,trips},period,now);
   const vehicleImage=vehicle?.imageUrl||referenceVehicleImages[vehicle?.type||"Carro"]||referenceVehicleImages.Carro;
   return <div className="page dashboard-v19 journey-dashboard">

@@ -9,6 +9,7 @@ import "./trip-map.css";
 import "./accessibility.css";
 import "./v19.css";
 import "./offline-navigation.css";
+import "./journey.css";
 
 const SITE_URL = "https://autoram-app-colombia.netlify.app";
 

@@ -1,7 +1,7 @@
 'use client';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { ArrowRight, LocateFixed, MapPin, Navigation, Route, Search, Volume2, VolumeX, X, WifiOff } from 'lucide-react';
+import { ArrowRight, ChevronRight, LocateFixed, MapPin, Navigation, Route, Search, Volume2, VolumeX, X, WifiOff } from 'lucide-react';
 import { searchAddress, type GeoResult } from '@/lib/geocoding';
 import { type LatLng, type TrackPoint } from '@/lib/geo';
 import { cumulativeDistances, distanceLabel, guidanceAt, loadPlannedRoute, projectRoute, requestRoute, savePlannedRoute, type PlannedRoute } from '@/lib/navigation';
@@ -14,6 +14,8 @@ type Props = { userId?: string | null; tracker?: ReturnType<typeof useTripTracke
 
 export default function NavigationPanel({ userId, tracker, onRouteChange, standalone = false, showDownloads = true }: Props) {
   const owner = userId || 'guest';
+  const plannerId = useId();
+  const [plannerExpanded, setPlannerExpanded] = useState(true);
   const [route, setRoute] = useState<PlannedRoute | null>(() => typeof window === 'undefined' ? null : loadPlannedRoute(owner));
   const [origin, setOrigin] = useState<LatLng | null>(null);
   const [destination, setDestination] = useState<LatLng | null>(null);
@@ -191,16 +193,20 @@ export default function NavigationPanel({ userId, tracker, onRouteChange, standa
   const covered = route?.coordinates.every(([lng, lat]) => { const area = regionAt(lng, lat); return area && savedIds.includes(area.id); });
   return <div className="navigation-panel">
     {showDownloads && <details className="maps-download-details"><summary><WifiOff size={18}/>Mapas sin internet <span>{savedIds.length ? `${savedIds.length} guardado${savedIds.length === 1 ? '' : 's'}` : 'Descargar zonas'}</span></summary><OfflineMapManager compact onSelect={route ? undefined : selectRegion}/></details>}
-    {!route ? <section className="route-planner" aria-label="Preparar navegación">
-      <div className="maps-section-title"><Route size={23}/><div><h2>¿A dónde vamos?</h2><p>Elige el destino y guarda la ruta antes de salir.</p></div></div>
-      <div className="route-planner__origin"><button type="button" onClick={locate} disabled={locating}><LocateFixed size={17}/>{locating ? 'Buscando ubicación…' : 'Usar mi ubicación'}</button><button type="button" onClick={() => setSelection('origin')} className={selection === 'origin' ? 'is-selected' : ''}>Elegir salida en el mapa</button></div>
-      <div className="route-search"><form onSubmit={search}><label className="sr-only" htmlFor="navigation-search">Dirección de destino</label><input id="navigation-search" placeholder="Dirección, lugar y ciudad" value={query} onChange={event => setQuery(event.target.value)} maxLength={180}/><button type="submit" disabled={searching || query.trim().length < 3} aria-label="Buscar destino"><Search size={18}/>{searching ? 'Buscando…' : 'Buscar'}</button></form>
-      {!!results.length && <ul className="route-search__results">{results.map((result, index) => <li key={`${result.lat}-${index}`}><button type="button" onClick={() => chooseDestination(result)}><MapPin size={16}/>{result.label}</button></li>)}</ul>}</div>
+    {!route ? <section className="route-planner journey-route-planner" aria-label="Preparar navegación">
       <div className="route-map-tools"><label>Zona <select value={region.id} onChange={event => selectRegion(MAP_REGIONS.find(item => item.id === event.target.value)!)}>{MAP_REGIONS.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><span>{selection === 'origin' ? 'Toca tu punto de salida' : 'Toca tu destino'}</span></div>
-      <DestinationMap key={region.id} origin={origin} destination={destination} onSelect={choosePoint} fallbackCenter={region.center as [number, number]} selectionHint={selection === 'origin' ? 'Toca tu punto de salida' : 'Toca el lugar de destino'} height="300px"/>
-      <div className="route-selection"><span><i className={origin ? 'selected' : ''}/>{origin ? 'Salida lista' : 'Elige tu salida'}</span><ArrowRight size={15}/><span><i className={destination ? 'selected' : ''}/>{destination ? destinationName : 'Elige tu destino'}</span></div>
-      <button type="button" className="maps-primary route-plan-button" onClick={() => void plan()} disabled={busy || locating || !origin || !destination}><Route size={19}/>{busy ? 'Calculando ruta…' : 'Calcular y guardar ruta'}</button>
-      <p className="maps-footnote">La ruta se calcula por carretera. El tiempo es una estimación y no incluye tráfico en vivo.</p>
+      <DestinationMap key={region.id} origin={origin} destination={destination} onSelect={choosePoint} fallbackCenter={region.center as [number, number]} selectionHint={selection === 'origin' ? 'Toca tu punto de salida' : 'Toca el lugar de destino'} height="420px"/>
+      <div className="route-planner__sheet">
+        <button type="button" className="route-sheet-toggle" aria-expanded={plannerExpanded} aria-controls={plannerId} onClick={() => setPlannerExpanded(value => !value)}><span className="route-sheet-handle" aria-hidden="true"/><Route size={23}/><span><b>¿A dónde vamos?</b><small>{plannerExpanded ? 'Prepara y guarda tu ruta' : destination ? destinationName : 'Toca para elegir salida y destino'}</small></span><ChevronRight size={20}/></button>
+        <div id={plannerId} hidden={!plannerExpanded} className="route-sheet-content">
+          <div className="route-planner__origin"><button type="button" onClick={locate} disabled={locating}><LocateFixed size={17}/>{locating ? 'Buscando ubicación…' : 'Usar mi ubicación'}</button><button type="button" aria-pressed={selection === 'origin'} onClick={() => setSelection('origin')} className={selection === 'origin' ? 'is-selected' : ''}>Elegir salida en el mapa</button></div>
+          <div className="route-search"><form onSubmit={search}><label className="sr-only" htmlFor="navigation-search">Dirección de destino</label><input id="navigation-search" placeholder="Dirección, lugar y ciudad" value={query} onChange={event => setQuery(event.target.value)} maxLength={180}/><button type="submit" disabled={searching || query.trim().length < 3} aria-label="Buscar destino"><Search size={18}/>{searching ? 'Buscando…' : 'Buscar'}</button></form>
+          {!!results.length && <ul className="route-search__results">{results.map((result, index) => <li key={`${result.lat}-${index}`}><button type="button" onClick={() => chooseDestination(result)}><MapPin size={16}/>{result.label}</button></li>)}</ul>}</div>
+          <div className="route-selection"><span><i className={origin ? 'selected' : ''}/>{origin ? 'Salida lista' : 'Elige tu salida'}</span><ArrowRight size={15}/><span><i className={destination ? 'selected' : ''}/>{destination ? destinationName : 'Elige tu destino'}</span></div>
+          <button type="button" className="maps-primary route-plan-button" onClick={() => void plan()} disabled={busy || locating || !origin || !destination}><Route size={19}/>{busy ? 'Calculando ruta…' : 'Calcular y guardar ruta'}</button>
+          <p className="maps-footnote">Tiempo estimado por carretera, sin tráfico en vivo. Calcular una ruta nueva requiere conexión.</p>
+        </div>
+      </div>
     </section> : <section className="navigation-guide" aria-label="Indicaciones de navegación">
       <div className="navigation-guide__top"><span><Navigation size={17}/>HACIA {route.destinationName}</span><button type="button" className="maps-icon-button" aria-label="Cambiar destino" onClick={clearRoute}><X size={19}/></button></div>
       <div className="navigation-guide__instruction"><span className="navigation-guide__distance">{offRoute ? 'Fuera de ruta' : running && !fresh ? 'Esperando GPS' : guidance?.arrived ? 'Llegaste' : `En ${distanceLabel(guidance?.nextInM ?? 0)}`}</span><h2>{offRoute ? 'Detente y revisa el camino' : guidance?.arrived ? 'Tu destino está aquí' : guidance?.next.instruction}</h2></div>
@@ -209,6 +215,8 @@ export default function NavigationPanel({ userId, tracker, onRouteChange, standa
       {!running && <button type="button" className="maps-primary" disabled={!!tracker?.hasDraft || tracker?.state === 'saving'} onClick={start}><Navigation size={18}/>{tracker ? 'Iniciar recorrido y navegar' : 'Iniciar navegación'}</button>}
       {standalone && running && <button type="button" className="maps-secondary" onClick={stopLocal}>Detener navegación</button>}
       {offRoute && <button type="button" className="maps-primary" disabled={busy || !fresh} onClick={() => void plan(true)}>{busy ? 'Calculando…' : 'Recalcular desde mi ubicación'}</button>}
+      <div className="journey-route-progress" role="progressbar" aria-label="Avance estimado de la ruta" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(Math.min(100,Math.max(0,alongM/(geometryDistances.at(-1)||route.distanceM)*100)))}><span style={{width:`${Math.min(100,Math.max(0,alongM/(geometryDistances.at(-1)||route.distanceM)*100))}%`}}/></div>
+      {covered&&<p className="maps-success"><WifiOff size={16}/> Esta ruta está dentro de tus zonas descargadas.</p>}
       {!covered && <p className="maps-notice"><WifiOff size={17}/>La ruta atraviesa una zona que no está descargada. Comprueba la cobertura antes de salir sin internet.</p>}
       <p className="maps-footnote">Ruta guardada {new Date(route.createdAt).toLocaleDateString('es-CO')}. Puedes seguir sus indicaciones sin señal. Recalcular requiere internet. La voz depende de las voces disponibles en tu teléfono.</p>
     </section>}

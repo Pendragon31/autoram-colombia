@@ -8,7 +8,7 @@ import {
   LockKeyhole, Moon, Pause, Phone, Play, ReceiptText, Save, ShieldCheck, Sparkles, Square, Sun, TimerReset, UserRound, WalletCards, Wrench, X,
 } from "lucide-react";
 import dynamic from "next/dynamic";
-import { autoramFetch, getSupabaseBrowserClient, signInWithGoogle } from "@/lib/supabase-browser";
+import { autoramFetch, getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { asError, authErrorMessage } from "@/lib/errors";
 import { outbox } from "@/lib/offline-queue";
@@ -79,7 +79,7 @@ function Brand() {
 function LoginFlow({authenticated,accountError="",initialMode="login"}:{authenticated:()=>Promise<void>;accountError?:string;initialMode?:"login"|"forgot"}) {
   const [mode,setMode]=useState<"login"|"signup"|"forgot">(initialMode); const [email,setEmail]=useState(""); const [password,setPassword]=useState("");
   const [showPassword,setShowPassword]=useState(false);
-  const [busy,setBusy]=useState<"email"|"google"|null>(null); const [error,setError]=useState(""); const [message,setMessage]=useState("");
+  const [busy,setBusy]=useState<"email"|null>(null); const [error,setError]=useState(""); const [message,setMessage]=useState("");
   const [retryAt,setRetryAt]=useState(0); const [remaining,setRemaining]=useState(0);
   useEffect(()=>{
     if(!retryAt)return;
@@ -100,12 +100,6 @@ function LoginFlow({authenticated,accountError="",initialMode="login"}:{authenti
       else if(mode==="login"){const {error:authError}=await supabase.auth.signInWithPassword({email:email.trim(),password});if(authError)throw authError;await authenticated()}
       else{const {data,error:authError}=await supabase.auth.signUp({email:email.trim(),password,options:{emailRedirectTo:window.location.origin}});if(authError)throw authError;if(data.session)await authenticated();else setMessage("Revisa tu correo y confirma la cuenta para entrar a Autoram.")}
     }catch(reason){setError(authErrorMessage(reason))}finally{setBusy(null)}};
-  const google=async()=>{
-    if(busy)return;setBusy("google");setError("");setMessage("");
-    try{await signInWithGoogle(window.location.origin)}
-    catch(reason){setError(authErrorMessage(reason))}
-    finally{setBusy(null)}
-  };
   return <main className="login-page">
     <section className="login-brand-panel"><div className="login-logo"><Brand/></div><div className="login-message"><span>AUTORAM COLOMBIA</span><h1>Tu vehículo.<br/><em>Tus números.</em><br/>Tu camino.</h1><p>Combustible, recorridos, mantenimiento y rentabilidad en una experiencia diseñada para conductores colombianos.</p></div><div className="login-proof"><div><ShieldCheck size={18}/><span><b>Información protegida</b><small>Cada conductor ve únicamente sus datos</small></span></div><div><Disc3 size={18}/><span><b>Parque automotor</b><small>Varios vehículos en una sola cuenta</small></span></div></div></section>
     <section className="login-form-panel"><div className="login-mobile-brand"><Brand/></div><div className="login-box">
@@ -117,7 +111,6 @@ function LoginFlow({authenticated,accountError="",initialMode="login"}:{authenti
         <button className="login-main" type="submit" disabled={Boolean(busy)||(mode==="forgot"&&remaining>0)}>{busy==="email"?(mode==="forgot"?"Enviando…":"Conectando…"):mode==="login"?"Ingresar":mode==="forgot"?(remaining>0?`Reenviar en ${remaining}s`:"Enviar enlace de recuperación"):"Crear cuenta"}<ChevronRight size={18}/></button>
       </form>
       {mode==="login"&&<button className="auth-forgot" type="button" disabled={Boolean(busy)} onClick={()=>changeMode("forgot")}>Olvidé mi contraseña</button>}
-      {mode!=="forgot"&&<><div className="login-divider"><span/>o continúa con<span/></div><button className="google-login" type="button" disabled={Boolean(busy)} onClick={google}><b aria-hidden="true">G</b>{busy==="google"?"Conectando con Google…":"Continuar con Google"}</button></>}
       <a className="auth-offline-link" href="/mapas">Mapas y navegación sin internet</a>
       <button className="auth-toggle" type="button" disabled={Boolean(busy)} onClick={()=>changeMode(mode==="login"?"signup":"login")}>{mode==="login"?"¿Primera vez? Crear una cuenta":mode==="forgot"?"Volver a ingresar":"Ya tengo cuenta · Ingresar"}</button>
       <div className="security-note"><LockKeyhole size={17}/><span>Autenticación y registros protegidos por Supabase.</span></div><p className="terms">Al continuar aceptas los términos de uso y la política de privacidad de Autoram.</p>

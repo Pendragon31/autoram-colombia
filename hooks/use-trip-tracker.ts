@@ -76,7 +76,7 @@ export function useTripTracker({ vehicleId, userId, maxAccuracyM = 50, minStepM 
     const last = pts.current.at(-1);
     if (last) {
       const stepKm = haversineKm({ lat: last[0], lng: last[1] }, { lat: p[0], lng: p[1] });
-      if (stepKm * 1000 < minStepM) { setState("tracking"); return; }
+      if (stepKm * 1000 < minStepM) { setState("tracking"); setMessage(""); return; }
       const kmh = speedKmh(last, p);
       if (kmh > maxJumpKmh) return;
       dist.current += stepKm;
@@ -93,7 +93,7 @@ export function useTripTracker({ vehicleId, userId, maxAccuracyM = 50, minStepM 
   }, [maxAccuracyM, minStepM, maxJumpKmh, persistDraft]);
 
   const onError = useCallback((err: GeolocationPositionError) => {
-    const msgs: Record<number, string> = { 1: "Autoriza la ubicación para registrar el recorrido.", 2: "No hay señal de GPS. Seguimos intentando.", 3: "El GPS tarda en responder. Seguimos intentando." };
+    const msgs: Record<number, string> = { 1: "La ubicación está bloqueada. Permite el acceso a la ubicación en los ajustes de este sitio y activa la ubicación del teléfono. Después vuelve a intentar registrar el recorrido.", 2: "No hay señal de GPS. Seguimos intentando.", 3: "El GPS tarda en responder. Seguimos intentando." };
     setMessage(msgs[err.code] ?? "No pudimos leer la ubicación.");
     if (err.code === 1) {
       if (watchId.current != null) navigator.geolocation.clearWatch(watchId.current);

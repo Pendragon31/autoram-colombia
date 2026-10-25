@@ -7,7 +7,7 @@ import { LocateFixed } from "lucide-react";
 import CanvasMap from "@/components/canvas-map";
 import { canUseWebGL } from "@/lib/map-capabilities";
 import { mapStyle } from "@/lib/map-style";
-import { routeBounds, type TrackPoint } from "@/lib/geo";
+import { routeBounds, trackGeometry, type TrackPoint } from "@/lib/geo";
 
 
 const BRAND_LIME = '#B8FF2C';
@@ -28,11 +28,11 @@ type Props = {
   fallbackCenter?: [number, number];
 };
 
-function toLineGeoJSON(points: TrackPoint[]): GeoJSON.Feature<GeoJSON.LineString> {
+function toLineGeoJSON(points: TrackPoint[]): GeoJSON.Feature<GeoJSON.MultiLineString> {
   return {
     type: 'Feature',
     properties: {},
-    geometry: { type: 'LineString', coordinates: points.map(([lat, lng]) => [lng, lat]) },
+    geometry: trackGeometry(points),
   };
 }
 
@@ -149,7 +149,7 @@ function applyPoints(m: MLMap, points: TrackPoint[], live: boolean, userMoved: b
   if (live) {
     const [lat, lng] = points[points.length - 1];
     let bearing=m.getBearing();
-    if(points.length>1){const [aLat,aLng]=points[points.length-2],dx=(lng-aLng)*Math.cos(lat*Math.PI/180),dy=lat-aLat;if(Math.hypot(dx,dy)*111320>4)bearing=Math.atan2(dx,dy)*180/Math.PI;}
+    if(points.length>1&&points[points.length-1][3]!==1){const [aLat,aLng]=points[points.length-2],dx=(lng-aLng)*Math.cos(lat*Math.PI/180),dy=lat-aLat;if(Math.hypot(dx,dy)*111320>4)bearing=Math.atan2(dx,dy)*180/Math.PI;}
     if (first || !userMoved) m.easeTo({ center: [lng, lat], zoom: Math.max(m.getZoom(), 15), bearing, pitch:35, duration: first?0:600 });
     return;
   }

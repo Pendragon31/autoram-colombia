@@ -93,6 +93,13 @@
 .journey-track-only>span { flex:1; }
 .journey-track-only b { display:block; font-size:14px; color:var(--ux-text); }
 .journey-track-only small { display:block; margin-top:4px; font-size:12px; color:var(--ux-muted); }
+.trip-feedback { display:flex; align-items:flex-start; gap:12px; padding:16px; margin:0 0 20px; border:1px solid var(--ux-line); border-radius:14px; background:var(--ux-panel); color:var(--ux-text); overflow-wrap:anywhere; }
+.trip-feedback>svg { flex-shrink:0; color:var(--ux-accent); margin-top:2px; }
+.trip-feedback>div { min-width:0; }
+.trip-feedback b { font-size:14px; line-height:1.5; }
+.trip-feedback p { margin:5px 0 0; font-size:14px; line-height:1.6; color:var(--ux-muted); }
+.trip-feedback[role="alert"] { border-color:var(--ux-negative); }
+.trip-feedback[role="alert"]>svg { color:var(--ux-negative); }
 .journey-map-page .nav-map-stage { border-radius:24px; margin-bottom:16px; }
 .cost-distribution { border:1px solid var(--ux-line); border-radius:17px; padding:18px; margin:18px 0; background:var(--ux-panel); }
 .cost-distribution__heading { display:flex; align-items:center; gap:10px; justify-content:space-between; margin-bottom:18px; }

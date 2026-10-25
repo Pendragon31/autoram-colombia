@@ -26,6 +26,7 @@ import JourneyOverview from "@/components/journey-overview";
 import CostDistribution from "@/components/cost-distribution";
 import ConnectionBadge from "@/components/connection-badge";
 import TripFeedback from "@/components/trip-feedback";
+import GpsQuality from "@/components/gps-quality";
 import { journeyWeek, type JourneyPeriod } from "@/lib/journey-summary";
 
 // Los mapas usan WebGL y el DOM: se cargan solo en el navegador.
@@ -399,12 +400,13 @@ function NavigatePage({userId,tracker,records,saveTrip}:{userId:string|null;trac
   const totalKm=records.reduce((sum,record)=>sum+record.distanceKm,0),totalTime=records.reduce((sum,record)=>sum+record.durationSeconds,0),averageSpeed=totalTime?totalKm/(totalTime/3600):0;
   const recent=records.slice(0,5);
   return <div className="page inner journey-map-page"><div className="journey-map-heading"><PageTitle over="TU RUTA, A LA VISTA" title="Sigue tu camino" text="Prepara la ruta, guarda sus indicaciones y registra tu recorrido."/><ConnectionBadge/></div>
+    <GpsQuality signal={tracker.signal} accuracyM={tracker.accuracyM} gapCount={tracker.gapCount}/>
     {error&&<div className="sync-warning"><AlertTriangle size={16}/><span><b>Atención con el GPS</b><small>{error}</small></span></div>}
     {tracker.hasDraft&&!running&&<div className="sync-warning trip-draft"><Navigation size={16}/><span><b>Quedó un recorrido sin terminar</b><small>La app se cerró mientras registrabas. Puedes retomarlo o descartarlo.</small></span><button type="button" className="primary" onClick={tracker.resume}>Retomar</button><button type="button" onClick={tracker.discardDraft}>Descartar</button></div>}
     {(plannedRoute||running||tracker.points.length>0||tracker.hasDraft)&&<section className={`nav-map-stage gps-${gpsState}`}>
       <TripMap points={tracker.points} live plannedRoute={plannedRoute?.coordinates} height="100%" fallbackCenter={fallbackCenter}/>
       {!running&&!tracker.points.length&&!plannedRoute&&<div className="nav-map-wait"><LocateFixed size={25}/><b>Inicia para mostrar tu ubicación</b><small>El mapa seguirá tu recorrido en vivo</small></div>}
-      <div className="nav-map-top"><span><i/>{gpsState==="live"?`GPS activo · precisión ${tracker.accuracyM} m`:gpsState==="connecting"?"Buscando señal…":gpsState==="error"?"GPS sin señal":"Listo para ubicarte"}</span><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer"><Map size={16}/>OpenStreetMap</a></div>
+      <div className="nav-map-top"><span><i/>{tracker.signal.label}</span><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer"><Map size={16}/>OpenStreetMap</a></div>
       <div className="trip"><div><small>RECORRIDO ACTUAL</small><b>{formatDuration(tracker.elapsed)}</b><em>{tracker.distanceKm.toLocaleString("es-CO",{minimumFractionDigits:2,maximumFractionDigits:2})} km{running?` · ${tracker.currentKmh} km/h`:""}</em></div><button className={running?"stop":""} disabled={saving||tracker.state==="saving"||(!running&&tracker.hasDraft)} onClick={()=>running?void finish():tracker.start()}>{running?<><X size={19}/>{saving?"Guardando…":"Finalizar"}</>:<><Navigation size={19}/>Iniciar recorrido</>}</button></div>
     </section>}
     <NavigationPanel key={userId??"guest"} userId={userId} tracker={tracker} onRouteChange={setPlannedRoute}/>

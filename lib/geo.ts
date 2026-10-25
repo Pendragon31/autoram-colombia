@@ -1,8 +1,22 @@
 // AUTORAM · utilidades geográficas puras (sin dependencias)
 
 export type LatLng = { lat: number; lng: number };
-/** Punto de recorrido: [lat, lng, epoch_ms] — compacto para guardar como jsonb */
-export type TrackPoint = [number, number, number];
+/** [lat, lng, epoch_ms, breakBefore?]. El 1 opcional inicia un tramo tras una interrupción. */
+export type TrackPoint = [number, number, number, 1?];
+
+/** Conserva los cortes explícitos incluso después de simplificar o guardar la ruta. */
+export function splitTrackSegments(points: TrackPoint[]): TrackPoint[][] {
+  const segments: TrackPoint[][] = [];
+  for (const point of points) {
+    if (!segments.length || point[3] === 1) segments.push([]);
+    segments[segments.length - 1].push(point);
+  }
+  return segments;
+}
+
+export function trackGeometry(points: TrackPoint[]): GeoJSON.MultiLineString {
+  return { type: 'MultiLineString', coordinates: splitTrackSegments(points).filter(segment => segment.length > 1).map(segment => segment.map(([lat, lng]) => [lng, lat])) };
+}
 
 const R_KM = 6371.0088;
 const toRad = (d: number) => (d * Math.PI) / 180;
@@ -19,6 +33,7 @@ export function haversineKm(a: LatLng, b: LatLng): number {
 
 /** Velocidad km/h entre dos puntos con marca de tiempo. */
 export function speedKmh(a: TrackPoint, b: TrackPoint): number {
+  if (b[3] === 1) return 0;
   const hours = (b[2] - a[2]) / 3_600_000;
   if (hours <= 0) return 0;
   return haversineKm({ lat: a[0], lng: a[1] }, { lat: b[0], lng: b[1] }) / hours;
@@ -28,6 +43,7 @@ export function speedKmh(a: TrackPoint, b: TrackPoint): number {
 export function routeLengthKm(points: TrackPoint[]): number {
   let km = 0;
   for (let i = 1; i < points.length; i++) {
+    if (points[i][3] === 1) continue;
     km += haversineKm({ lat: points[i - 1][0], lng: points[i - 1][1] }, { lat: points[i][0], lng: points[i][1] });
   }
   return km;
@@ -52,6 +68,11 @@ function perpendicularDistanceM(p: TrackPoint, a: TrackPoint, b: TrackPoint): nu
  * toleranceM ≈ 8-12 m es invisible en un mapa y recorta 70-90 % del peso.
  */
 export function simplifyRoute(points: TrackPoint[], toleranceM = 10): TrackPoint[] {
+  if (points.some(point => point[3] === 1)) return splitTrackSegments(points).flatMap(segment => simplifySegment(segment, toleranceM));
+  return simplifySegment(points, toleranceM);
+}
+
+function simplifySegment(points: TrackPoint[], toleranceM: number): TrackPoint[] {
   if (points.length <= 2) return points;
   const keep = new Uint8Array(points.length);
   keep[0] = 1;

@@ -16,12 +16,13 @@ function compile(source, imports, globals = {}) {
   return exports;
 }
 const TripFeedback = compile(fs.readFileSync(path.join(root, 'components/trip-feedback.tsx'), 'utf8'), require).default;
+const GpsQuality = compile(fs.readFileSync(path.join(root, 'components/gps-quality.tsx'), 'utf8'), require).default;
 // Render the actual navigation screen, not a copy of its feedback condition.
 const pageSource = fs.readFileSync(path.join(root, 'app/page.tsx'), 'utf8');
 const screenSource = pageSource.slice(pageSource.indexOf('function NavigatePage('), pageSource.indexOf('function MaintenancePage('));
 const empty = () => null;
 const NavigatePage = compile(screenSource + '\nexports.NavigatePage = NavigatePage;', require, {
-  useState: React.useState, TripFeedback, TripMap: empty, NavigationPanel: empty,
+  useState: React.useState, TripFeedback, GpsQuality, TripMap: empty, NavigationPanel: empty,
   PageTitle: empty, ConnectionBadge: empty, LocationShare: empty, Metric: empty, Title: empty,
   AlertTriangle: empty, Navigation: empty, LocateFixed: empty, Map: empty, X: empty,
   ChevronRight: empty, Route: empty, Gauge: empty, TimerReset: empty,
@@ -31,6 +32,7 @@ function render(tracker) {
   return renderToStaticMarkup(React.createElement(NavigatePage, { userId: 'qa', tracker, records: [], saveTrip: async () => {} }));
 }
 const geo = evaluate('lib/geo.ts', () => {});
+const signal = evaluate('lib/gps-signal.ts', () => {});
 function trackerHarness({ supported = true, draft = null } = {}) {
   const slots = [], memory = new Map(); let cursor = 0, onPosition, onError, clears = 0;
   if (draft) memory.set('autoram.trip.draft.v1', JSON.stringify(draft));
@@ -41,7 +43,7 @@ function trackerHarness({ supported = true, draft = null } = {}) {
   };
   const intervals = new Set(); let nextTimer = 0;
   const navigator = supported ? { geolocation: { watchPosition(position, error) { onPosition = position; onError = error; return 7; }, clearWatch() { clears++; } } } : {};
-  const hook = evaluate('hooks/use-trip-tracker.ts', id => id === 'react' ? react : id.includes('offline-queue') ? { newClientId: () => 'qa-trip' } : geo, {
+  const hook = evaluate('hooks/use-trip-tracker.ts', id => id === 'react' ? react : id.includes('offline-queue') ? { newClientId: () => 'qa-trip' } : id.includes('gps-signal') ? signal : geo, {
     navigator, localStorage: { getItem: key => memory.get(key) || null, setItem: (key, value) => memory.set(key, value), removeItem: key => memory.delete(key) },
     window: { setInterval: () => { const id = ++nextTimer; intervals.add(id); return id; }, clearInterval: id => intervals.delete(id) },
   }).useTripTracker;
@@ -84,11 +86,12 @@ test('denial while resuming preserves the draft and keeps the error beside Retom
   assert.match(html, /ubicación está bloqueada/);
   assert.equal(JSON.parse(env.memory.get('autoram.trip.draft.v1')).clientId, 'qa-existing');
 });
-test('stationary accurate GPS fixes clear a prior temporary signal warning', () => {
+test('a stationary fix after a signal error replaces the warning with recovery and excludes the gap', () => {
   const env = trackerHarness(); env.snapshot().start(); env.position(4.15, -73.63);
   env.error(2); assert.match(env.snapshot().message, /No hay señal/);
   env.position(4.15, -73.63, Date.now() + 1000);
-  assert.equal(env.snapshot().message, ''); assert.equal(env.snapshot().points.length, 1);
+  assert.doesNotMatch(env.snapshot().message, /No hay señal/); assert.match(env.snapshot().message, /Señal recuperada/);
+  assert.equal(env.snapshot().state, 'tracking'); assert.equal(env.snapshot().distanceKm, 0);
 });
 test('a completed empty trip keeps its explanation visible after its map closes', () => {
   const env = trackerHarness(); env.snapshot().start(); assert.equal(env.snapshot().stop(), null);

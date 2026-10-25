@@ -4,7 +4,7 @@ import { LocateFixed, Minus, Plus } from 'lucide-react';
 import { mapArchive } from '@/lib/map-archive';
 import { regionAt, type MapRegion } from '@/lib/offline-maps';
 import { fitView, paintLabels, paintVectorTile, worldLocation, worldPoint, type MapView } from '@/lib/canvas-map';
-import type { LatLng, TrackPoint } from '@/lib/geo';
+import { splitTrackSegments, type LatLng, type TrackPoint } from '@/lib/geo';
 type Props = { center: [number, number]; zoom?: number; dark?: boolean; region?: MapRegion; points?: TrackPoint[]; live?: boolean; route?: [number, number][]; origin?: LatLng | null; destination?: LatLng | null; onSelect?: (point: LatLng) => void; coverage?: number[] };
 const tiles = new Map<string, ArrayBuffer>();
 export default function CanvasMap({ center, zoom = 13, dark = false, region, points = [], live = false, route, origin, destination, onSelect, coverage }: Props) {
@@ -80,7 +80,7 @@ export default function CanvasMap({ center, zoom = 13, dark = false, region, poi
       }
       if (coverage) { const [w, s, e, n] = coverage; path([[w,s],[e,s],[e,n],[w,n],[w,s]], '#247955', 2, [7,4]); }
       if (route?.length) { path(route, dark ? '#122017' : '#ffffff', 9); path(route, dark ? '#76c5f5' : '#155b9b', 5); }
-      if (points.length) { const coordinates = points.map(([lat,lng]) => [lng,lat] as [number,number]); path(coordinates, '#172219', 6); path(coordinates, '#b8ff2c', 3); }
+      for (const segment of splitTrackSegments(points)) { const coordinates = segment.map(([lat,lng]) => [lng,lat] as [number,number]); path(coordinates, '#172219', 6); path(coordinates, '#b8ff2c', 3); }
       function marker(point: LatLng, color: string, radius = 7) {
         const [x,y] = position(point.lng,point.lat); context!.beginPath();context!.arc(x,y,radius,0,2*Math.PI);context!.fillStyle=color;context!.fill();context!.lineWidth=3;context!.strokeStyle='#ffffff';context!.stroke();
       }

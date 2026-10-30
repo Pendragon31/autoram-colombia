@@ -83,9 +83,9 @@ export default function FuecPage() {
         <p className="fuec-note"><b>Importante:</b> esta herramienta prepara una impresión. La empresa habilitada debe verificar el contrato, asignar el consecutivo oficial y autorizar o firmar el FUEC antes de usarlo en un servicio.</p>
         <div className="fuec-grid">
           <div className="fuec-section">Empresa y contrato</div>
-          {fields.slice(0, 14).map(([key,label,required]) => <label className="fuec-field" key={key}>{label}{required&&" *"}<input required={Boolean(required)} type={key==="startDate"||key==="endDate"||key==="issuedAt"?"date":"text"} value={form[key]} onChange={e=>update(key,e.target.value)}/></label>)}
+          {fields.slice(0, 13).map(([key,label,required]) => <label className="fuec-field" key={key}>{label}{required&&" *"}<input required={Boolean(required)} type={key==="startDate"||key==="endDate"||key==="issuedAt"?"date":"text"} value={form[key]} onChange={e=>update(key,e.target.value)}/></label>)}
           <div className="fuec-section">Vehículo y conductor</div>
-          {fields.slice(14).map(([key,label,required]) => <label className="fuec-field" key={key}>{label}{required&&" *"}<input required={Boolean(required)} type={key==="startDate"||key==="endDate"||key==="issuedAt"?"date":"text"} value={form[key]} onChange={e=>update(key,e.target.value)}/></label>)}
+          {fields.slice(13).map(([key,label,required]) => <label className="fuec-field" key={key}>{label}{required&&" *"}<input required={Boolean(required)} type={key==="startDate"||key==="endDate"||key==="issuedAt"?"date":"text"} value={form[key]} onChange={e=>update(key,e.target.value)}/></label>)}
         </div>
         {error&&<div className="fuec-error" role="alert">{error}</div>}
         <div className="fuec-actions"><button className="secondary" type="button" onClick={()=>{setForm(empty);setError("");try{localStorage.removeItem(storageKey)}catch{}}}>Limpiar formulario</button><button type="button" onClick={print}>Vista de impresión / Imprimir</button></div>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 type FormData = {
+  logoData: string;
   company: string; companyNit: string; companyResolution: string; manager: string;
   fuecNumber: string; contractNumber: string; contractor: string; contractorId: string;
   purpose: string; origin: string; destination: string; startDate: string; endDate: string;
@@ -11,7 +12,7 @@ type FormData = {
 };
 
 const empty: FormData = {
-  company: "", companyNit: "", companyResolution: "", manager: "", fuecNumber: "",
+  logoData: "", company: "", companyNit: "", companyResolution: "", manager: "", fuecNumber: "",
   contractNumber: "", contractor: "", contractorId: "", purpose: "", origin: "", destination: "",
   startDate: "", endDate: "", plate: "", brand: "", model: "", vehicleClass: "", internalNumber: "",
   operationCard: "", driver: "", driverId: "", issuedAt: new Date().toISOString().slice(0, 10),
@@ -34,6 +35,7 @@ export default function FuecPage() {
   const [form, setForm] = useState<FormData>(empty);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
+  const [logoError, setLogoError] = useState("");
 
   useEffect(() => {
     try {
@@ -50,6 +52,16 @@ export default function FuecPage() {
   }, [form, ready]);
 
   const update = (key: keyof FormData, value: string) => setForm(current => ({ ...current, [key]: value }));
+  const uploadLogo = (file?: File) => {
+    setLogoError("");
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { setLogoError("Selecciona una imagen válida."); return; }
+    if (file.size > 2 * 1024 * 1024) { setLogoError("El logo debe pesar máximo 2 MB."); return; }
+    const reader = new FileReader();
+    reader.onload = () => { if (typeof reader.result === "string") setForm(current => ({ ...current, logoData: reader.result as string })); };
+    reader.onerror = () => setLogoError("No pudimos leer el archivo. Intenta con otra imagen.");
+    reader.readAsDataURL(file);
+  };
   const print = () => {
     const missing = fields.filter(([key, , required]) => required && !form[key].trim()).map(([, label]) => label);
     if (missing.length) { setError("Completa los campos obligatorios: " + missing.join(", ") + "."); return; }
@@ -70,7 +82,7 @@ export default function FuecPage() {
       .fuec-section{grid-column:1/-1;margin:9px 0 0;padding-top:13px;border-top:1px solid #e7eee9;color:#24583d;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
       .fuec-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:22px}.fuec-actions button{border:0;border-radius:10px;background:#174b38;color:#fff;padding:12px 18px;font-weight:700;font-size:15px;cursor:pointer}
       .fuec-actions .secondary{background:#e6eee8;color:#28523c}.fuec-error{margin-top:14px;background:#fff0ef;color:#9b3029;border-radius:10px;padding:12px;font-size:13px;line-height:1.5}
-      .fuec-paper{display:none}.fuec-label{color:#637267}.fuec-value{font-weight:700}.fuec-sign{margin-top:54px;display:flex;justify-content:space-between;gap:40px}.fuec-sign div{border-top:1px solid #333;padding-top:8px;min-width:240px;text-align:center}
+      .fuec-paper{display:none}.fuec-logo-preview{display:flex;align-items:center;gap:12px;margin:0 0 16px}.fuec-logo-preview img{max-width:170px;max-height:72px;object-fit:contain}.fuec-paper-logo{display:block;max-width:160px;max-height:70px;object-fit:contain;margin:0 auto 12px}.fuec-label{color:#637267}.fuec-value{font-weight:700}.fuec-sign{margin-top:54px;display:flex;justify-content:space-between;gap:40px}.fuec-sign div{border-top:1px solid #333;padding-top:8px;min-width:240px;text-align:center}
       @media(max-width:640px){.fuec-app{padding:16px 10px 40px}.fuec-card{padding:18px 14px}.fuec-grid{grid-template-columns:1fr}.fuec-section{grid-column:auto}.fuec-title{font-size:24px}.fuec-actions{align-items:stretch;flex-direction:column}.fuec-actions button{width:100%}}
       @media print{ @page{size:letter portrait;margin:14mm}.fuec-app{padding:0;background:#fff}.fuec-head,.fuec-editor{display:none!important}.fuec-paper{display:block!important;color:#111;font-family:Arial,sans-serif;font-size:11pt}.fuec-paper h1{text-align:center;font-size:16pt;margin:0 0 4px}.fuec-paper h2{text-align:center;font-size:12pt;margin:0 0 20px}.fuec-paper table{border-collapse:collapse;width:100%;margin:0 0 12px}.fuec-paper td{border:1px solid #777;padding:8px;vertical-align:top;width:50%}.fuec-label{display:block;font-size:8pt;text-transform:uppercase;margin-bottom:5px}.fuec-value{display:block;min-height:15px}.fuec-disclaimer{font-size:8pt;line-height:1.4;margin-top:14px;color:#333}.fuec-sign{margin-top:55px}.fuec-sign div{min-width:42%}}
     `}</style>
@@ -81,6 +93,7 @@ export default function FuecPage() {
         <h1 className="fuec-title">Preparar FUEC para impresión</h1>
         <p className="fuec-intro">Completa la información del contrato y del vehículo. Los datos quedan guardados en este dispositivo para facilitar el siguiente diligenciamiento.</p>
         <p className="fuec-note"><b>Importante:</b> esta herramienta prepara una impresión. La empresa habilitada debe verificar el contrato, asignar el consecutivo oficial y autorizar o firmar el FUEC antes de usarlo en un servicio.</p>
+        <div className="fuec-logo-preview"><label className="fuec-field">Logo para el membrete (PNG, JPG o WEBP · máximo 2 MB)<input type="file" accept="image/png,image/jpeg,image/webp" onChange={e=>uploadLogo(e.target.files?.[0])}/></label>{form.logoData&&<img src={form.logoData} alt="Vista previa del logo de la empresa"/>}</div>{logoError&&<div className="fuec-error" role="alert">{logoError}</div>}
         <div className="fuec-grid">
           <div className="fuec-section">Empresa y contrato</div>
           {fields.slice(0, 13).map(([key,label,required]) => <label className="fuec-field" key={key}>{label}{required&&" *"}<input required={Boolean(required)} type={key==="startDate"||key==="endDate"||key==="issuedAt"?"date":"text"} value={form[key]} onChange={e=>update(key,e.target.value)}/></label>)}
@@ -92,7 +105,7 @@ export default function FuecPage() {
       </section>
 
       <article className="fuec-paper">
-        <h1>{form.company || "EMPRESA DE TRANSPORTE ESPECIAL"}</h1><h2>FORMATO ÚNICO DE EXTRACTO DEL CONTRATO · FUEC</h2>
+        {form.logoData&&<img className="fuec-paper-logo" src={form.logoData} alt="Logo de la empresa"/>}<h1>{form.company || "EMPRESA DE TRANSPORTE ESPECIAL"}</h1><h2>FORMATO ÚNICO DE EXTRACTO DEL CONTRATO · FUEC</h2>
         <table><tbody>
           <tr><td><span className="fuec-label">Número de FUEC</span><span className="fuec-value">{form.fuecNumber}</span></td><td><span className="fuec-label">NIT empresa</span><span className="fuec-value">{form.companyNit}</span></td></tr>
           <tr><td><span className="fuec-label">Número del contrato</span><span className="fuec-value">{form.contractNumber}</span></td><td><span className="fuec-label">Contratante · identificación</span><span className="fuec-value">{form.contractor} · {form.contractorId}</span></td></tr>

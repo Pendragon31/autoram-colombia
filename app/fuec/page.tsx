@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";\nimport Link from "next/link";
 
 type FormData = {
   logoData: string;
@@ -38,11 +38,14 @@ export default function FuecPage() {
   const [logoError, setLogoError] = useState("");
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(storageKey);
-      if (saved) setForm({ ...empty, ...JSON.parse(saved) });
-    } catch { /* Si el almacenamiento local no está disponible, el formulario sigue funcionando. */ }
-    setReady(true);
+    const timer = window.setTimeout(() => {
+      try {
+        const saved = localStorage.getItem(storageKey);
+        if (saved) setForm({ ...empty, ...JSON.parse(saved) });
+      } catch { /* Si el almacenamiento local no está disponible, el formulario sigue funcionando. */ }
+      setReady(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -88,7 +91,7 @@ export default function FuecPage() {
     `}</style>
 
     <div className="fuec-wrap">
-      <header className="fuec-head"><div className="fuec-brand">AUTORAM<small>COLOMBIA · DOCUMENTOS</small></div><a href="/">← Volver a AutoRAM</a></header>
+      <header className="fuec-head"><div className="fuec-brand">AUTORAM<small>COLOMBIA · DOCUMENTOS</small></div><Link href="/">← Volver a AutoRAM</Link></header>
       <section className="fuec-card fuec-editor">
         <h1 className="fuec-title">Preparar FUEC para impresión</h1>
         <p className="fuec-intro">Completa la información del contrato y del vehículo. Los datos quedan guardados en este dispositivo para facilitar el siguiente diligenciamiento.</p>
